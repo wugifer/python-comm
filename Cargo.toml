@@ -1,0 +1,7 @@
+[package]
+name = "python_comm"
+version = "0.1.0"
+authors = ["wugifer <wugifer@>"]
+edition = "2018"
+
+[dependencies]
