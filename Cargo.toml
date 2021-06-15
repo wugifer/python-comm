@@ -3,5 +3,7 @@ name = "python_comm"
 version = "0.1.0"
 authors = ["wugifer <wugifer@>"]
 edition = "2018"
+description = "to make writing python modules with rust easier."
+license = "MIT OR Apache-2.0"
 
 [dependencies]
