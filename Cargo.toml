@@ -1,9 +1,19 @@
 [package]
 name = "python_comm"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["wugifer <wugifer@>"]
 edition = "2018"
 description = "to make writing python modules with rust easier."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/wugifer/python-comm"
+documentation = "https://docs.rs/python-comm/"
 
 [dependencies]
+anyhow             = "1.0"
+chrono             = "0.4"
+cpython            = "0.6"
+rust_decimal       = "1.14"
+python_comm_macros = "0.1"
+
+[dev-dependencies]
+rust_decimal_macros = "1.14"
