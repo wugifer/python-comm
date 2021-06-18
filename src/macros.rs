@@ -75,16 +75,16 @@ macro_rules! crate_version {
 macro_rules! from_py {
     // 0. 从 dict 中提取
     ( $py:tt, dict, $($any:tt),+ ) => {
-        from_py!(get_item, take, $py, $($any),+)
+        from_py!(get_item, take, $py, $($any,)+)
     };
 
     // 1. 从 obj 中提取
     ( $py:tt, obj, $($any:tt),+ ) => {
-        from_py!(getattr, ok, $py, $($any),+)
+        from_py!(getattr, ok, $py, $($any,)+)
     };
 
     // *.0. 指定缺省值
-    ( $($any:tt),+ default $default:expr ) => {
+    ( $($any:tt),+ default $default:expr $(,)* ) => {
         {
             let ret: Result<_, anyhow::Error> = match from_py!($($any),+) {
                 Ok(object) => Ok(object),
@@ -103,7 +103,7 @@ macro_rules! from_py {
     };
 
     // *.*.0. 不指定类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr ) => {
+    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr $(,)* ) => {
         from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object.extract($py).or_else(|err| {
                 let __func__ = "from_py!";
@@ -113,7 +113,7 @@ macro_rules! from_py {
     };
 
     // *.*.1. 指定 datetime 类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, datetime ) => {
+    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, datetime $(,)* ) => {
         from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object
                 .call_method($py, "timestamp", cpython::NoArgs, None)
@@ -138,7 +138,7 @@ macro_rules! from_py {
     };
 
     // *.*.2. 指定 Decimal 类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, Decimal ) => {
+    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, Decimal $(,)* ) => {
         from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object
                 .call_method($py, "as_integer_ratio", cpython::NoArgs, None)
@@ -176,7 +176,7 @@ macro_rules! from_py {
     };
 
     // *.*.3. 指定其它类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, $type:ty ) => {
+    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, $type:ty $(,)* ) => {
         from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object.extract::<$type>($py).or_else(|err| {
                 let __func__ = "from_py!";

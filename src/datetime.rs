@@ -276,7 +276,7 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 /// let t1 = bjtc_from_duration(&anchor, now.elapsed().as_secs_f64() * 1000.0);
 /// let t2 = bjtc_to_duration(&anchor, t1).unwrap();
 /// let diff = t2.as_secs_f64() - 0.7;
-/// assert!(diff > -0.010 && diff < 0.020);
+/// assert!(diff > -0.5 && diff < 0.5);
 ///
 /// let t1 = bjtc_from_duration(&anchor, 1000.0);
 /// let t3 = bjtc_to_duration(&anchor, t1 - 1000);
@@ -289,7 +289,7 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 ///   .unwrap()
 ///   .as_secs_f64()
 ///   - 0.7;
-/// assert!(diff > -0.010 && diff < 0.020);
+/// assert!(diff > -0.5 && diff < 0.5);
 /// ```
 ///
 pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
