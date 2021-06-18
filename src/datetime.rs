@@ -78,6 +78,22 @@ pub fn bj_timestamp() -> i64 {
     Utc::now().timestamp()
 }
 
+/// 北京时间, 时间戳, 精确到毫秒
+///
+/// ## 用法
+///
+/// ```
+/// use python_comm::prelude::*;
+///
+/// let ts = bj_timestamp_millis();
+/// assert!(ts > 1623913021000 && ts < 1623913021000 + 86400000 * 36500);
+/// ```
+///
+#[inline]
+pub fn bj_timestamp_millis() -> i64 {
+    Utc::now().timestamp_millis()
+}
+
 /// bjtc_xy 北京时间的各种表达方式之间转换
 ///
 /// ## 转换类型
@@ -100,7 +116,7 @@ pub fn bj_timestamp() -> i64 {
 /// use python_comm::prelude::*;
 ///
 /// let ts = bj_timestamp();
-/// let a = bjtc_nt(ts).unwrap();
+/// let a = bjtc_nt(ts, 10).unwrap();
 /// let b = bjtc_ts(&a);
 /// let c = bjtc_st(&b).unwrap();
 /// let d = bjtc_tf(&c);
@@ -136,7 +152,11 @@ pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
-    bjtc_nd(timestamp as i64).or_else(|err| raise_error!(__func__, timestamp, "\n", err))
+    bjtc_nd(
+        timestamp as i64,
+        ((timestamp - (timestamp as i64 as f64)) * 1000.0) as u32,
+    )
+    .or_else(|err| raise_error!(__func__, timestamp, "\n", err))
 }
 
 /// 见 bjtc_df
@@ -152,7 +172,11 @@ pub fn bjtc_fs(timestamp: f64) -> Result<String, anyhow::Error> {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
-    bjtc_nt(timestamp as i64).or_else(|err| raise_error!(__func__, timestamp, "\n", err))
+    bjtc_nt(
+        timestamp as i64,
+        ((timestamp - (timestamp as i64 as f64)) * 1000.0) as u32,
+    )
+    .or_else(|err| raise_error!(__func__, timestamp, "\n", err))
 }
 
 // nx
@@ -160,8 +184,8 @@ pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
 /// 见 bjtc_df
 #[inline]
 #[auto_func_name]
-pub fn bjtc_nd(timestamp: i64) -> Result<NaiveDate, anyhow::Error> {
-    Ok(bjtc_td(&bjtc_nt(timestamp).or_else(|err| {
+pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, anyhow::Error> {
+    Ok(bjtc_td(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
 }
@@ -169,8 +193,8 @@ pub fn bjtc_nd(timestamp: i64) -> Result<NaiveDate, anyhow::Error> {
 /// 见 bjtc_df
 #[inline]
 #[auto_func_name]
-pub fn bjtc_ns(timestamp: i64) -> Result<String, anyhow::Error> {
-    Ok(bjtc_ts(&bjtc_nt(timestamp).or_else(|err| {
+pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
+    Ok(bjtc_ts(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
 }
@@ -178,8 +202,8 @@ pub fn bjtc_ns(timestamp: i64) -> Result<String, anyhow::Error> {
 /// 见 bjtc_df
 #[inline]
 #[auto_func_name]
-pub fn bjtc_nt(timestamp: i64) -> Result<NaiveDateTime, anyhow::Error> {
-    NaiveDateTime::from_timestamp_opt(timestamp, 0)
+pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Error> {
+    NaiveDateTime::from_timestamp_opt(timestamp, millis * 1000000)
         .ok_or(raise_error!(__func__, format!("无效时间戳 {}", timestamp)))
 }
 
@@ -229,7 +253,7 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 
 //
 
-/// 转换 duration 为 timestamp, 舍弃不足 1 秒的时间
+/// 转换 duration 为 timestamp, 精确到毫秒
 ///
 /// 在同一时刻记录 DateTime 为 anchor, 创建 time::Instant 为 now,
 /// 则在之后的任意时刻
@@ -238,8 +262,6 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 ///
 /// bjtc_to_duration 转换 timestamp 为 now.duration()
 ///
-/// bjtc_xxx_duration(), as_secs() 分别有一些舍入, 除极端情况外, 来回合计恰好 1 秒
-///
 /// ## 用法
 ///
 /// ```
@@ -247,48 +269,82 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 /// use python_comm::prelude::*;
 /// use std::{thread, time};
 ///
-/// let anchor = Utc::now();  // x.y 秒
+/// let anchor = Utc::now();
 /// let now = time::Instant::now();
 ///
-/// thread::sleep(time::Duration::from_millis(2700));  // 2.7 秒
-/// let t1 = bjtc_from_duration(&anchor, now.elapsed().as_secs());  // 先舍弃 0.7 秒, 再舍弃 0.y 秒 => x+2
-/// let t2 = bjtc_to_duration(&anchor, t1).unwrap();  // 2-0.y 秒, 舍弃 1-0.y 秒
-/// assert_eq!(t2.as_secs(), 1);
+/// thread::sleep(time::Duration::from_millis(700));  // 0.7 秒
+/// let t1 = bjtc_from_duration(&anchor, now.elapsed().as_secs_f64() * 1000.0);
+/// let t2 = bjtc_to_duration(&anchor, t1).unwrap();
+/// let diff = t2.as_secs_f64() - 0.7;
+/// assert!(diff > -0.0024 && diff < 0.0024);
 ///
-/// let t1 = bjtc_from_duration(&anchor, 1000);
+/// let t1 = bjtc_from_duration(&anchor, 1000.0);
 /// let t3 = bjtc_to_duration(&anchor, t1 - 1000);
 /// assert_eq!(t3.is_err(), false);
+/// assert_eq!(t3.unwrap().as_secs_f64(), 0.0);
 /// let t4 = bjtc_to_duration(&anchor, t1 - 1001);
 /// assert_eq!(t4.is_err(), true);
-/// assert_eq!(t3.unwrap().as_secs(), 0);
 ///
-/// assert_eq!(
-///   bjtc_to_duration(&anchor, bj_timestamp())
-///     .unwrap()
-///     .as_secs(),
-///   2
-/// );
+/// let diff = bjtc_to_duration(&anchor, bj_timestamp_millis())
+///   .unwrap()
+///   .as_secs_f64()
+///   - 0.7;
+/// assert!(diff > -0.0024 && diff < 0.0024);
 /// ```
 ///
-pub fn bjtc_from_duration(anchor: &DateTime<Utc>, duration: u64) -> i64 {
-    (*anchor + chrono::Duration::seconds(duration as i64)).timestamp()
+pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
+    (*anchor + chrono::Duration::milliseconds(millis as i64)).timestamp_millis()
 }
 
 /// 转换 timestamp 为 duration
 #[auto_func_name]
 pub fn bjtc_to_duration(
     anchor: &DateTime<Utc>,
-    timestamp: i64,
+    timestamp_millis: i64,
 ) -> Result<time::Duration, anyhow::Error> {
-    let elapsed = bjtc_nt(timestamp).or_else(|err| raise_error!(__func__, timestamp, "\n", err))?
+    let elapsed = bjtc_nt(timestamp_millis / 1000, (timestamp_millis % 1000) as u32)
+        .or_else(|err| raise_error!(__func__, timestamp_millis, "\n", err))?
         - anchor.naive_utc();
 
-    if elapsed.num_seconds() >= 0 {
-        Ok(time::Duration::from_secs(elapsed.num_seconds() as u64))
+    if elapsed.num_milliseconds() >= 0 {
+        Ok(time::Duration::from_millis(
+            elapsed.num_milliseconds() as u64
+        ))
     } else {
         Err(raise_error!(
             __func__,
-            format!("{} 结果为负值 {}", timestamp, elapsed.num_seconds())
+            format!("{} 结果为负值 {}", timestamp_millis, elapsed.num_seconds())
         ))
+    }
+}
+
+#[cfg(test)]
+mod bjtc_test {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_bjtc_from_to_duration() {
+        let anchor = Utc::now();
+        let now = time::Instant::now();
+
+        thread::sleep(time::Duration::from_millis(700)); // 0.7 秒
+        let t1 = bjtc_from_duration(&anchor, now.elapsed().as_secs_f64() * 1000.0);
+        let t2 = bjtc_to_duration(&anchor, t1).unwrap();
+        let diff = t2.as_secs_f64() - 0.7;
+        assert!(diff > -0.0014 && diff < 0.0014);
+
+        let t1 = bjtc_from_duration(&anchor, 1000.0);
+        let t3 = bjtc_to_duration(&anchor, t1 - 1000);
+        assert_eq!(t3.is_err(), false);
+        assert_eq!(t3.unwrap().as_secs_f64(), 0.0);
+        let t4 = bjtc_to_duration(&anchor, t1 - 1001);
+        assert_eq!(t4.is_err(), true);
+
+        let diff = bjtc_to_duration(&anchor, bj_timestamp_millis())
+            .unwrap()
+            .as_secs_f64()
+            - 0.7;
+        assert!(diff > -0.0014 && diff < 0.0014);
     }
 }
