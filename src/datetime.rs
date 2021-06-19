@@ -1,5 +1,5 @@
 use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, Utc};
-use python_comm_macros::auto_func_name;
+use python_comm_macros::auto_func_name2;
 use std::time;
 
 /// 北京时间, 日期
@@ -150,7 +150,7 @@ pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
     bjtc_nd(
         timestamp as i64,
@@ -161,7 +161,7 @@ pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_fs(timestamp: f64) -> Result<String, anyhow::Error> {
     Ok(bjtc_ts(&bjtc_ft(timestamp).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
@@ -170,7 +170,7 @@ pub fn bjtc_fs(timestamp: f64) -> Result<String, anyhow::Error> {
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
     bjtc_nt(
         timestamp as i64,
@@ -183,7 +183,7 @@ pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, anyhow::Error> {
     Ok(bjtc_td(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
@@ -192,7 +192,7 @@ pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, anyhow::Error> 
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
     Ok(bjtc_ts(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
@@ -201,7 +201,7 @@ pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Error> {
     NaiveDateTime::from_timestamp_opt(timestamp, millis * 1000000)
         .ok_or(raise_error!(__func__, format!("无效时间戳 {}", timestamp)))
@@ -211,7 +211,7 @@ pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Err
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_sd(text: &String) -> Result<NaiveDate, anyhow::Error> {
     NaiveDate::parse_from_str(text, "%Y-%m-%d")
         .or_else(|err| raise_error!(__func__, text, "\n", err))
@@ -219,7 +219,7 @@ pub fn bjtc_sd(text: &String) -> Result<NaiveDate, anyhow::Error> {
 
 /// 见 bjtc_df
 #[inline]
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_st(text: &String) -> Result<NaiveDateTime, anyhow::Error> {
     NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S")
         .or_else(|err| raise_error!(__func__, text, "\n", err))
@@ -297,7 +297,7 @@ pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
 }
 
 /// 转换 timestamp 为 duration
-#[auto_func_name]
+#[auto_func_name2]
 pub fn bjtc_to_duration(
     anchor: &DateTime<Utc>,
     timestamp_millis: i64,
