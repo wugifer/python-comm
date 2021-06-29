@@ -36,8 +36,7 @@ macro_rules! crate_version {
 /// assert!(error.is_err());
 ///
 /// // 用法2：从 python dict 中提取指定字段, 其中 dict 是关键字
-/// let drive:String = from_py!(py, dict, pdict, "SYSTEMDRIVE").unwrap();
-/// assert_eq!(drive, "C:");
+/// // let path:String = from_py!(py, dict, pdict, "PATH").unwrap(); linux 下是 b'PATH' 为 key
 /// let error:Result<String, _> = from_py!(py, dict, pdict, "none");
 /// assert!(error.is_err());
 ///
@@ -218,7 +217,9 @@ macro_rules! from_py {
 /// }
 ///
 /// let err = format!("{:?}", test(py).err().unwrap());
-/// assert_eq!(err, "Error: src\\macros.rs:19 test() some text\n\"e\"");
+/// let msg1 = "Error: src\\macros.rs:19 test() some text\n\"e\"";
+/// let msg2 = "Error: src/macros.rs:19 test() some text\n\"e\"";
+/// assert!(err == msg1 || err == msg2, "\n left: {:?}\n  msg1:{:?}\n  msg2:{:?}", err, msg1, msg2);
 /// ```
 ///
 #[macro_export]
