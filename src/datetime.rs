@@ -367,7 +367,7 @@ pub fn bjtc_to_duration(
 }
 
 #[cfg(test)]
-mod bjtc_test {
+mod test {
     use super::*;
     use std::thread;
 
@@ -393,6 +393,6 @@ mod bjtc_test {
             .unwrap()
             .as_secs_f64()
             - 0.7;
-        assert!(diff > -0.01 && diff < 0.01);
+        assert!(diff > -0.1 && diff < 0.1);
     }
 }
