@@ -14,8 +14,6 @@ use std::time;
 ///
 #[inline]
 pub fn bj_date() -> NaiveDate {
-    //*
-
     bj_time().date()
 }
 
@@ -31,8 +29,6 @@ pub fn bj_date() -> NaiveDate {
 ///
 #[inline]
 pub fn bj_dates() -> String {
-    //*
-
     bj_date().format("%Y-%m-%d").to_string()
 }
 
@@ -48,8 +44,6 @@ pub fn bj_dates() -> String {
 ///
 #[inline]
 pub fn bj_time() -> NaiveDateTime {
-    //*
-
     (Utc::now() + Duration::hours(8)).naive_utc()
 }
 
@@ -65,8 +59,6 @@ pub fn bj_time() -> NaiveDateTime {
 ///
 #[inline]
 pub fn bj_times() -> String {
-    //*
-
     bj_time().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
@@ -83,8 +75,6 @@ pub fn bj_times() -> String {
 ///
 #[inline]
 pub fn bj_timestamp() -> i64 {
-    //*
-
     Utc::now().timestamp()
 }
 
@@ -101,8 +91,6 @@ pub fn bj_timestamp() -> i64 {
 ///
 #[inline]
 pub fn bj_timestamp_millis() -> i64 {
-    //*
-
     Utc::now().timestamp_millis()
 }
 
@@ -137,32 +125,24 @@ pub fn bj_timestamp_millis() -> i64 {
 ///
 #[inline]
 pub fn bjtc_df(date: &NaiveDate) -> f64 {
-    //*
-
     bjtc_dn(date) as f64
 }
 
 /// 见 bjtc_df
 #[inline]
 pub fn bjtc_dn(date: &NaiveDate) -> i64 {
-    //*
-
     bjtc_tn(&bjtc_dt(date))
 }
 
 /// 见 bjtc_df
 #[inline]
 pub fn bjtc_ds(date: &NaiveDate) -> String {
-    //*
-
     date.format("%Y-%m-%d").to_string()
 }
 
 /// 见 bjtc_df
 #[inline]
 pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
-    //*
-
     date.and_hms(0, 0, 0)
 }
 
@@ -172,8 +152,6 @@ pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
-    //*
-
     bjtc_nd(
         timestamp as i64,
         ((timestamp - (timestamp as i64 as f64)) * 1000.0) as u32,
@@ -185,8 +163,6 @@ pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_fs(timestamp: f64) -> Result<String, anyhow::Error> {
-    //*
-
     Ok(bjtc_ts(&bjtc_ft(timestamp).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
@@ -196,8 +172,6 @@ pub fn bjtc_fs(timestamp: f64) -> Result<String, anyhow::Error> {
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
-    //*
-
     bjtc_nt(
         timestamp as i64,
         ((timestamp - (timestamp as i64 as f64)) * 1000.0) as u32,
@@ -211,8 +185,6 @@ pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, anyhow::Error> {
-    //*
-
     Ok(bjtc_td(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
@@ -222,8 +194,6 @@ pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, anyhow::Error> 
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
-    //*
-
     Ok(bjtc_ts(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
@@ -233,8 +203,6 @@ pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Error> {
-    //*
-
     NaiveDateTime::from_timestamp_opt(timestamp, millis * 1000000)
         .ok_or(raise_error!(__func__, format!("无效时间戳 {}", timestamp)))
 }
@@ -245,8 +213,6 @@ pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Err
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_sd(text: &String) -> Result<NaiveDate, anyhow::Error> {
-    //*
-
     NaiveDate::parse_from_str(text, "%Y-%m-%d")
         .or_else(|err| raise_error!(__func__, text, "\n", err))
 }
@@ -255,8 +221,6 @@ pub fn bjtc_sd(text: &String) -> Result<NaiveDate, anyhow::Error> {
 #[inline]
 #[auto_func_name2]
 pub fn bjtc_st(text: &String) -> Result<NaiveDateTime, anyhow::Error> {
-    //*
-
     NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S")
         .or_else(|err| raise_error!(__func__, text, "\n", err))
 }
@@ -266,32 +230,24 @@ pub fn bjtc_st(text: &String) -> Result<NaiveDateTime, anyhow::Error> {
 /// 见 bjtc_df
 #[inline]
 pub fn bjtc_td(time: &NaiveDateTime) -> NaiveDate {
-    //*
-
     time.date()
 }
 
 /// 见 bjtc_df
 #[inline]
 pub fn bjtc_tf(time: &NaiveDateTime) -> f64 {
-    //*
-
     bjtc_tn(time) as f64
 }
 
 /// 见 bjtc_dn
 #[inline]
 pub fn bjtc_tn(time: &NaiveDateTime) -> i64 {
-    //*
-
     time.timestamp()
 }
 
 /// 见 bjtc_df
 #[inline]
 pub fn bjtc_ts(time: &NaiveDateTime) -> String {
-    //*
-
     time.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
@@ -337,8 +293,6 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 /// ```
 ///
 pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
-    //*
-
     (*anchor + chrono::Duration::milliseconds(millis as i64)).timestamp_millis()
 }
 
@@ -348,8 +302,6 @@ pub fn bjtc_to_duration(
     anchor: &DateTime<Utc>,
     timestamp_millis: i64,
 ) -> Result<time::Duration, anyhow::Error> {
-    //*
-
     let elapsed = bjtc_nt(timestamp_millis / 1000, (timestamp_millis % 1000) as u32)
         .or_else(|err| raise_error!(__func__, timestamp_millis, "\n", err))?
         - anchor.naive_utc();
