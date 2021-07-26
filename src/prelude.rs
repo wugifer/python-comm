@@ -16,7 +16,9 @@ pub use crate::{
         bjtc_ds, bjtc_dt, bjtc_fd, bjtc_from_duration, bjtc_fs, bjtc_ft, bjtc_nd, bjtc_ns, bjtc_nt,
         bjtc_sd, bjtc_st, bjtc_td, bjtc_tf, bjtc_tn, bjtc_to_duration, bjtc_ts,
     },
-    from_py, raise_error, to_py,
+    from_py, raise_error,
+    textsearcher::TextSearcher,
+    to_py,
 };
 pub use chrono::{Datelike, Timelike};
 pub use cpython::ObjectProtocol;

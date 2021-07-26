@@ -3,4 +3,6 @@ mod macros;
 
 mod datetime;
 
+mod textsearcher;
+
 pub mod prelude;
