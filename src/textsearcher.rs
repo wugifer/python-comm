@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use ahash::AHashMap;
+use cpython::{py_fn, PyErr, PyModule, Python};
+use lazy_static::lazy_static;
+use python_comm_macros::auto_func_name2;
+use std::{collections::HashMap, sync::Mutex};
 
 /// 关键字查找节点
 ///
@@ -131,7 +135,7 @@ mod keyword_node_test {
 ///
 /// Step3.  ts.create_blues();
 ///
-/// Step4.  ts.search() / ts.replace();  // ts 可复用
+/// Step4.  ts.match_() / ts.subst();  // ts 可复用
 ///
 /// ```
 /// use python_comm::prelude::TextSearcher;
@@ -146,7 +150,7 @@ mod keyword_node_test {
 /// ts1.create_blues();
 ///
 /// assert_eq!(
-///     ts0.search("abcdefghijklmn"),
+///     ts0.match_("abcdefghijklmn"),
 ///     [
 ///         (String::from("bcdef"), 1, 6),    // 返回匹配的每个关键字及起始位置
 ///         (String::from("defghi"), 3, 9),
@@ -154,7 +158,7 @@ mod keyword_node_test {
 ///     ]
 /// );
 /// assert_eq!(
-///     ts1.search("abcdefghijklmn"),
+///     ts1.match_("abcdefghijklmn"),
 ///     [
 ///         (String::from("X"), 1, 6),    // 返回匹配的每个关键字别名及起始位置
 ///         (String::from("Y"), 3, 9),
@@ -162,7 +166,7 @@ mod keyword_node_test {
 ///     ]
 /// );
 /// assert_eq!(
-///     ts1.replace("abcdefghijklmn"),    // 替换匹配的每个关键字, 如果出现重叠则不替换
+///     ts1.subst("abcdefghijklmn"),    // 替换匹配的每个关键字, 如果出现重叠则不替换
 ///     "aXgZlmn"
 /// );
 /// ```
@@ -172,10 +176,10 @@ pub struct TextSearcher {
     nodes: Vec<KeywordNode>,
 
     // 黑色箭头, node + letter -> node
-    blacks: HashMap<(usize, char), usize>,
+    blacks: AHashMap<(usize, char), usize>,
 
     // 蓝色箭头, node -> node
-    blues: HashMap<usize, usize>,
+    blues: AHashMap<usize, usize>,
 }
 
 impl TextSearcher {
@@ -250,6 +254,41 @@ impl TextSearcher {
         return node_id;
     }
 
+    /// 查找
+    pub fn match_(&self, text: &str) -> Vec<(String, usize, usize)> {
+        // 从 root 出发
+        let mut names = Vec::new();
+        let mut node_id = 1;
+        let mut posy = 0;
+
+        // 遍历每个字符
+        for letter in text.chars() {
+            posy += 1;
+            loop {
+                // 沿黑色或蓝色箭头前进
+                let (next_node_id, used) = self.move_front(node_id, letter);
+                node_id = next_node_id;
+                let node = &self.nodes[node_id - 1];
+                // 输出蓝色节点
+                if node.is_blue {
+                    if used {
+                        // 含当前字符
+                        names.push((node.name(), posy - node.letters.len(), posy));
+                    } else {
+                        // 不含当前字符
+                        names.push((node.name(), posy - node.letters.len() - 1, posy - 1));
+                    }
+                }
+                // 下一个字符
+                if used {
+                    break;
+                }
+            }
+        }
+
+        names
+    }
+
     /// 沿黑色或蓝色箭头前进
     fn move_front(
         &self,
@@ -277,13 +316,13 @@ impl TextSearcher {
     pub fn new() -> Self {
         Self {
             nodes: vec![KeywordNode::new(Vec::new())],
-            blacks: HashMap::new(),
-            blues: HashMap::new(),
+            blacks: AHashMap::new(),
+            blues: AHashMap::new(),
         }
     }
 
     /// 替换
-    pub fn replace(&self, text: &str) -> String {
+    pub fn subst(&self, text: &str) -> String {
         // 从 root 出发
         let mut result: (String, usize) = (String::new(), 0);
         let mut last_found: (String, usize, usize) = (String::new(), 0, 0);
@@ -326,7 +365,7 @@ impl TextSearcher {
         }
 
         // 使用上一次的结果
-        if last_found.2 >= last_found.1 {
+        if last_found.2 >= last_found.1 && last_found.1 >= result.1 {
             for i in result.1..last_found.1 {
                 result.0.push(letters[i]);
             }
@@ -340,41 +379,6 @@ impl TextSearcher {
         }
 
         result.0
-    }
-
-    /// 查找
-    pub fn search(&self, text: &str) -> Vec<(String, usize, usize)> {
-        // 从 root 出发
-        let mut names = Vec::new();
-        let mut node_id = 1;
-        let mut posy = 0;
-
-        // 遍历每个字符
-        for letter in text.chars() {
-            posy += 1;
-            loop {
-                // 沿黑色或蓝色箭头前进
-                let (next_node_id, used) = self.move_front(node_id, letter);
-                node_id = next_node_id;
-                let node = &self.nodes[node_id - 1];
-                // 输出蓝色节点
-                if node.is_blue {
-                    if used {
-                        // 含当前字符
-                        names.push((node.name(), posy - node.letters.len(), posy));
-                    } else {
-                        // 不含当前字符
-                        names.push((node.name(), posy - node.letters.len() - 1, posy - 1));
-                    }
-                }
-                // 下一个字符
-                if used {
-                    break;
-                }
-            }
-        }
-
-        names
     }
 }
 
@@ -488,39 +492,7 @@ mod text_searcher_test {
     }
 
     #[test]
-    fn test_new() {
-        let ts = TextSearcher::new();
-        assert_eq!(ts.nodes.len(), 1);
-        assert_eq!(ts.blacks.len(), 0);
-        assert_eq!(ts.blues.len(), 0);
-
-        assert_eq!(ts.nodes[0].to_string(), "[], , false");
-    }
-
-    #[test]
-    fn test_replace1() {
-        let mut ts = TextSearcher::new();
-        for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
-            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
-        }
-        ts.create_blues();
-
-        assert_eq!(ts.replace("abccab"), "xabyxcyxcyxaby");
-    }
-
-    #[test]
-    fn test_replace2() {
-        let mut ts = TextSearcher::new();
-        for keyword in &["bcdef", "defghi", "hijk"] {
-            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
-        }
-        ts.create_blues();
-
-        assert_eq!(ts.replace("abcdefghijklmn"), "axbcdefygxhijkylmn");
-    }
-
-    #[test]
-    fn test_search1() {
+    fn test_match1() {
         let mut ts = TextSearcher::new();
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
             ts.add_keyword(String::from(*keyword), None);
@@ -528,7 +500,7 @@ mod text_searcher_test {
         ts.create_blues();
 
         assert_eq!(
-            ts.search("abccab"),
+            ts.match_("abccab"),
             [
                 (String::from("a"), 0, 1),
                 (String::from("ab"), 0, 2),
@@ -542,7 +514,7 @@ mod text_searcher_test {
     }
 
     #[test]
-    fn test_search2() {
+    fn test_match2() {
         let mut ts = TextSearcher::new();
         for keyword in &["北京", "欢迎", "你"] {
             ts.add_keyword(String::from(*keyword), None);
@@ -550,7 +522,7 @@ mod text_searcher_test {
         ts.create_blues();
 
         assert_eq!(
-            ts.search("北京欢迎你"),
+            ts.match_("北京欢迎你"),
             [
                 (String::from("北京"), 0, 2),
                 (String::from("欢迎"), 2, 4),
@@ -560,7 +532,7 @@ mod text_searcher_test {
     }
 
     #[test]
-    fn test_search3() {
+    fn test_match3() {
         let mut ts = TextSearcher::new();
         for keyword in &["bcdef", "defghi", "hijk"] {
             ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
@@ -568,7 +540,7 @@ mod text_searcher_test {
         ts.create_blues();
 
         assert_eq!(
-            ts.search("abcdefghijklmn"),
+            ts.match_("abcdefghijklmn"),
             [
                 (String::from("xbcdefy"), 1, 6),
                 (String::from("xdefghiy"), 3, 9),
@@ -576,4 +548,267 @@ mod text_searcher_test {
             ]
         );
     }
+
+    #[test]
+    fn test_new() {
+        let ts = TextSearcher::new();
+        assert_eq!(ts.nodes.len(), 1);
+        assert_eq!(ts.blacks.len(), 0);
+        assert_eq!(ts.blues.len(), 0);
+
+        assert_eq!(ts.nodes[0].to_string(), "[], , false");
+    }
+
+    #[test]
+    fn test_subst1() {
+        let mut ts = TextSearcher::new();
+        for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
+            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
+        }
+        ts.create_blues();
+
+        assert_eq!(ts.subst("abccab"), "xabyxcyxcyxaby");
+    }
+
+    #[test]
+    fn test_subst2() {
+        let mut ts = TextSearcher::new();
+        for keyword in &["bcdef", "defghi", "hijk"] {
+            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
+        }
+        ts.create_blues();
+
+        assert_eq!(ts.subst("abcdefghijklmn"), "axbcdefygxhijkylmn");
+    }
+
+    #[test]
+    fn test_subst3() {
+        let mut ts = TextSearcher::new();
+        for keyword in &["bdpk", "dpk"] {
+            ts.add_keyword(String::from(*keyword), Some("_keyword_".to_string()));
+        }
+        ts.create_blues();
+
+        assert_eq!(ts.subst("abdpkz"), "a_keyword_z");
+    }
+}
+
+struct TextSearcherManager {
+    /// ts 总数
+    count: i32,
+
+    /// tsid -> ts
+    tss: HashMap<i32, TextSearcher>,
+}
+
+impl TextSearcherManager {
+    /// 添加 ts
+    fn add_text_searcher(&mut self, tsid: i32, ts: TextSearcher) {
+        self.tss.insert(tsid, ts);
+    }
+
+    /// 获取 ts
+    #[auto_func_name2]
+    fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, anyhow::Error> {
+        self.tss
+            .remove(&tsid)
+            .ok_or_else(|| raise_error!(__func__, format!("指定的 TextSearcher={} 无效", tsid)))
+    }
+
+    /// 构造
+    fn new() -> Self {
+        Self {
+            count: 0,
+            tss: HashMap::new(),
+        }
+    }
+
+    /// 创建 ts
+    fn new_text_searcher(&mut self, keywords: Vec<(String, Option<String>)>) -> i32 {
+        self.count += 1;
+
+        let mut ts = TextSearcher::new();
+        for (keyword, name) in keywords {
+            ts.add_keyword(keyword, name);
+        }
+        ts.create_blues();
+
+        self.tss.insert(self.count, ts);
+
+        self.count
+    }
+
+    /// 删除 ts
+    fn remove_text_searcher(&mut self, tsid: i32) {
+        self.tss.remove(&tsid);
+    }
+}
+
+// 定义全局变量 GLOBALS
+lazy_static! {
+    static ref TSM: Mutex<TextSearcherManager> = Mutex::new(TextSearcherManager::new());
+}
+
+/// text_search_ex_free 接口
+#[auto_func_name2]
+fn text_search_ex_free(python: Python, tsid: i32) -> Result<i32, PyErr> {
+    let mut tsm = TSM
+        .lock()
+        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+
+    tsm.remove_text_searcher(tsid);
+
+    Ok(0)
+}
+
+/// text_search_ex_init 接口
+#[auto_func_name2]
+fn text_search_ex_init(
+    python: Python,
+    keywords: Vec<(String, Option<String>)>,
+) -> Result<i32, PyErr> {
+    let mut tsm = TSM
+        .lock()
+        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+
+    let tsid = tsm.new_text_searcher(keywords);
+
+    Ok(tsid)
+}
+
+/// text_search_ex_match 接口
+#[auto_func_name2]
+fn text_search_ex_match(
+    python: Python,
+    tsid: i32,
+    text: &str,
+) -> Result<Vec<(String, usize, usize)>, PyErr> {
+    let mut tsm = TSM
+        .lock()
+        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+
+    let ts = tsm
+        .get_text_searcher(tsid)
+        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+
+    let result = ts.match_(text);
+    tsm.add_text_searcher(tsid, ts);
+
+    Ok(result)
+}
+
+/// text_search_ex_subst 接口
+#[auto_func_name2]
+fn text_search_ex_subst(python: Python, tsid: i32, text: &str) -> Result<String, PyErr> {
+    let mut tsm = TSM
+        .lock()
+        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+
+    let ts = tsm
+        .get_text_searcher(tsid)
+        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+
+    // #[cfg(target_os = "linux")]
+    // let (guard, prof) = (pprof::ProfilerGuard::new(100).unwrap(), true);
+
+    let result = ts.subst(text);
+    tsm.add_text_searcher(tsid, ts);
+
+    // #[cfg(target_os = "linux")]
+    {
+        // use std::fs::File;
+        // if prof {
+        //     if let Ok(report) = guard.report().build() {
+        //         let file = File::create("flamegraph.svg").unwrap();
+        //         let mut options = pprof::flamegraph::Options::default();
+        //         options.image_width = Some(1280);
+        //         report.flamegraph_with_options(file, &mut options).unwrap();
+        //     }
+        // }
+    }
+
+    Ok(result)
+}
+
+/// text_search_match 接口
+fn text_search_match(
+    _python: Python,
+    keywords: Vec<String>,
+    text: &str,
+) -> Result<Vec<(String, usize, usize)>, PyErr> {
+    let mut ts = TextSearcher::new();
+    for keyword in keywords {
+        ts.add_keyword(keyword.to_string(), None);
+    }
+    ts.create_blues();
+
+    Ok(ts.match_(text))
+}
+
+/// text_search_subst 接口
+fn text_search_subst(
+    _python: Python,
+    keywords: Vec<(String, String)>,
+    text: &str,
+) -> Result<String, PyErr> {
+    let mut ts = TextSearcher::new();
+    for (keyword, name) in keywords {
+        ts.add_keyword(keyword, Some(name));
+    }
+    ts.create_blues();
+
+    Ok(ts.subst(text))
+}
+
+/// python 扩展模块初始化
+pub fn module_initializer(python: Python, module: &PyModule) -> Result<(), PyErr> {
+    // 查找, 按 u8 切分, 仅用一次
+    module.add(
+        python,
+        "text_search_once",
+        py_fn!(python, text_search_match(keywords: Vec<String>, text: &str)),
+    )?;
+
+    // 替换, 按 char 切分, 仅用一次
+    module.add(
+        python,
+        "text_search_subst",
+        py_fn!(
+            python,
+            text_search_subst(keywords: Vec<(String, String)>, text: &str)
+        ),
+    )?;
+
+    // 查找/替换, 按 char 切分, 初始化
+    module.add(
+        python,
+        "text_search_ex_init",
+        py_fn!(
+            python,
+            text_search_ex_init(keywords: Vec<(String, Option<String>)>)
+        ),
+    )?;
+
+    // 查找/替换, 按 char 切分, 查询
+    module.add(
+        python,
+        "text_search_ex_match",
+        py_fn!(python, text_search_ex_match(tsid: i32, text: &str)),
+    )?;
+
+    // 查找/替换, 按 char 切分, 替换
+    module.add(
+        python,
+        "text_search_ex_subst",
+        py_fn!(python, text_search_ex_subst(tsid: i32, text: &str)),
+    )?;
+
+    // 查找/替换, 按 char 切分, 释放
+    module.add(
+        python,
+        "text_search_ex_free",
+        py_fn!(python, text_search_ex_free(tsid: i32)),
+    )?;
+
+    Ok(())
 }
