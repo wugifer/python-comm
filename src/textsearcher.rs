@@ -2,19 +2,24 @@ use ahash::AHashMap;
 use cpython::{py_fn, PyErr, PyModule, Python};
 use lazy_static::lazy_static;
 use python_comm_macros::auto_func_name2;
-use std::{collections::HashMap, sync::Mutex};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, mem::take, sync::Mutex};
 
 /// 关键字查找节点
 ///
 /// 因为采用 usize 作为内部引用, 因此 TextSearch 一旦建立, 不允许修改
+#[derive(Serialize, Deserialize, Clone)]
 struct KeywordNode {
-    // 关键字
+    /// 关键字, 在 create_blues 之后不再使用, 仅保留 length
     letters: Vec<char>,
 
-    // 仅用于蓝色节点, 节点名, 缺省是关键字, 可设置别名或用于替换的名字
+    /// 关键字长度
+    length: usize,
+
+    /// 仅用于蓝色节点, 节点名, 缺省是关键字, 可设置别名或用于替换的名字
     name: String,
 
-    // 蓝色节点
+    /// 蓝色节点
     is_blue: bool,
 }
 
@@ -26,8 +31,10 @@ impl KeywordNode {
 
     /// 构造
     fn new(letters: Vec<char>) -> Self {
+        let length = letters.len();
         Self {
             letters,
+            length,
             name: String::new(),
             is_blue: false,
         }
@@ -36,7 +43,10 @@ impl KeywordNode {
     /// debug 用
     #[cfg(test)]
     fn to_string(&self) -> String {
-        format!("{:?}, {}, {}", self.letters, self.name, self.is_blue)
+        format!(
+            "{:?}/{}, {}, {}",
+            self.letters, self.length, self.name, self.is_blue
+        )
     }
 }
 
@@ -47,7 +57,20 @@ mod keyword_node_test {
     #[test]
     fn test_new() {
         let node = KeywordNode::new("abc".chars().collect::<Vec<char>>());
-        assert_eq!(node.to_string(), "[\'a\', \'b\', \'c\'], , false");
+        assert_eq!(node.to_string(), "[\'a\', \'b\', \'c\']/3, , false");
+    }
+
+    #[test]
+    fn test_serde() {
+        let node = KeywordNode::new("abc".chars().collect());
+        let text = serde_json::to_string(&node).unwrap();
+        assert_eq!(
+            text,
+            "{\"letters\":[\"a\",\"b\",\"c\"],\"length\":3,\"name\":\"\",\"is_blue\":false}"
+        );
+
+        let node: KeywordNode = serde_json::from_str(&text).unwrap();
+        assert_eq!(node.to_string(), "[\'a\', \'b\', \'c\']/3, , false");
     }
 }
 
@@ -143,8 +166,8 @@ mod keyword_node_test {
 /// let mut ts0 = TextSearcher::new();
 /// let mut ts1 = TextSearcher::new();
 /// for (keyword, title) in &[("bcdef", "X"), ("defghi", "Y"), ("hijk", "Z")] {
-///     ts0.add_keyword(String::from(*keyword), None);
-///     ts1.add_keyword(String::from(*keyword), Some(String::from(*title)));
+///     ts0.add_keyword(keyword.to_string(), None);
+///     ts1.add_keyword(keyword.to_string(), Some(title)).to_string();
 /// }
 /// ts0.create_blues();
 /// ts1.create_blues();
@@ -152,17 +175,17 @@ mod keyword_node_test {
 /// assert_eq!(
 ///     ts0.match_("abcdefghijklmn"),
 ///     [
-///         (String::from("bcdef"), 1, 6),    // 返回匹配的每个关键字及起始位置
-///         (String::from("defghi"), 3, 9),
-///         (String::from("hijk"), 7, 11)
+///         ("bcdef".to_string(), 1, 6),    // 返回匹配的每个关键字及起始位置
+///         ("defghi".to_string(), 3, 9),
+///         ("hijk".to_string(), 7, 11)
 ///     ]
 /// );
 /// assert_eq!(
 ///     ts1.match_("abcdefghijklmn"),
 ///     [
-///         (String::from("X"), 1, 6),    // 返回匹配的每个关键字别名及起始位置
-///         (String::from("Y"), 3, 9),
-///         (String::from("Z"), 7, 11)
+///         ("X".to_string(), 1, 6),    // 返回匹配的每个关键字别名及起始位置
+///         ("Y".to_string(), 3, 9),
+///         ("Z".to_string(), 7, 11)
 ///     ]
 /// );
 /// assert_eq!(
@@ -221,11 +244,11 @@ impl TextSearcher {
     pub fn create_blues(&mut self) {
         // 遍历每个节点
         for node_id in 1..=self.nodes.len() {
-            let letters = &self.nodes[node_id - 1].letters;
-            let letters_len = letters.len();
+            // 用 length 代替 letters, 省空间, 尤其是 save/load 不需要 letters
+            let letters = take(&mut self.nodes[node_id - 1].letters);
 
             // 遍历每个真后缀
-            for start in 1..letters_len {
+            for start in 1..letters.len() {
                 // 如果真后缀也在树中, 创建蓝色箭头, 只要最长后缀
                 let target_node_id = self.get_node_by_keyword(&letters[start..]);
                 if target_node_id != 0 {
@@ -254,6 +277,13 @@ impl TextSearcher {
         return node_id;
     }
 
+    #[auto_func_name2]
+    pub fn load(text: String) -> Result<Self, anyhow::Error> {
+        Ok(serde_json::from_str::<TextSearcherForSerde>(&text)
+            .or_else(|err| raise_error!(__func__, "\n", err))?
+            .to())
+    }
+
     /// 查找
     pub fn match_(&self, text: &str) -> Vec<(String, usize, usize)> {
         // 从 root 出发
@@ -273,10 +303,10 @@ impl TextSearcher {
                 if node.is_blue {
                     if used {
                         // 含当前字符
-                        names.push((node.name(), posy - node.letters.len(), posy));
+                        names.push((node.name(), posy - node.length, posy));
                     } else {
                         // 不含当前字符
-                        names.push((node.name(), posy - node.letters.len() - 1, posy - 1));
+                        names.push((node.name(), posy - node.length - 1, posy - 1));
                     }
                 }
                 // 下一个字符
@@ -284,6 +314,60 @@ impl TextSearcher {
                     break;
                 }
             }
+        }
+
+        names
+    }
+
+    pub fn match_line(&self, text: &str) -> Vec<(String, usize, usize)> {
+        // 从 root 出发
+        let mut names = Vec::new();
+        let mut name = String::new();
+        let mut found = (false, 0, 0);
+        let mut node_id = 1;
+        let mut posy = 0;
+
+        // 遍历每个字符
+        for letter in text.chars() {
+            if letter == '\r' || letter == '\n' {
+                // 输出
+                if found.0 {
+                    names.push((name, found.1, found.2));
+                }
+                // 重置
+                name = String::new();
+                found = (false, 0, 0);
+                node_id = 1;
+                posy = 0;
+                continue;
+            } else {
+                name.push(letter);
+                posy += 1;
+            }
+            loop {
+                // 沿黑色或蓝色箭头前进
+                let (next_node_id, used) = self.move_front(node_id, letter);
+                node_id = next_node_id;
+                let node = &self.nodes[node_id - 1];
+                // 输出蓝色节点
+                if node.is_blue {
+                    if used {
+                        // 含当前字符
+                        found = (true, posy - node.length, posy);
+                    } else {
+                        // 不含当前字符
+                        found = (true, posy - node.length - 1, posy - 1);
+                    }
+                }
+                // 下一个字符
+                if used {
+                    break;
+                }
+            }
+        }
+
+        if found.0 {
+            names.push((name, found.1, found.2));
         }
 
         names
@@ -321,6 +405,12 @@ impl TextSearcher {
         }
     }
 
+    #[auto_func_name2]
+    pub fn save(&self) -> Result<String, anyhow::Error> {
+        serde_json::to_string(&TextSearcherForSerde::from(self))
+            .or_else(|err| raise_error!(__func__, "\n", err))
+    }
+
     /// 替换
     pub fn subst(&self, text: &str) -> String {
         // 从 root 出发
@@ -341,9 +431,9 @@ impl TextSearcher {
                 // 检查蓝色节点
                 if node.is_blue {
                     let found = if used {
-                        (node.name(), posy - node.letters.len(), posy)
+                        (node.name(), posy - node.length, posy)
                     } else {
-                        (node.name(), posy - node.letters.len() - 1, posy - 1)
+                        (node.name(), posy - node.length - 1, posy - 1)
                     };
                     if found.1 != last_found.1 {
                         // 使用上一次的结果
@@ -389,11 +479,11 @@ mod text_searcher_test {
     #[test]
     fn test_add_keyword1() {
         let mut ts = TextSearcher::new();
-        ts.add_keyword(String::from("ab"), None);
+        ts.add_keyword("ab".to_string(), None);
 
         assert_eq!(ts.nodes.len(), 3);
-        assert_eq!(ts.nodes[1].to_string(), "[\'a\'], , false");
-        assert_eq!(ts.nodes[2].to_string(), "[\'a\', \'b\'], ab, true");
+        assert_eq!(ts.nodes[1].to_string(), "[\'a\']/1, , false");
+        assert_eq!(ts.nodes[2].to_string(), "[\'a\', \'b\']/2, ab, true");
         let mut blacks = ts
             .blacks
             .iter()
@@ -407,18 +497,11 @@ mod text_searcher_test {
     fn test_add_keyword2() {
         let mut ts = TextSearcher::new();
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
-            ts.add_keyword(String::from(*keyword), None);
+            ts.add_keyword(keyword.to_string(), None);
         }
 
-        println!(
-            "{:?}",
-            ts.nodes
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-        );
         assert_eq!(ts.nodes.len(), 11);
-        assert_eq!(ts.nodes[6].to_string(), "[\'b\', \'c\'], bc, true");
+        assert_eq!(ts.nodes[6].to_string(), "[\'b\', \'c\']/2, bc, true");
         let mut blacks = ts
             .blacks
             .iter()
@@ -446,7 +529,7 @@ mod text_searcher_test {
     fn test_create_blues() {
         let mut ts = TextSearcher::new();
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
-            ts.add_keyword(String::from(*keyword), None);
+            ts.add_keyword(keyword.to_string(), None);
         }
         ts.create_blues();
 
@@ -467,7 +550,7 @@ mod text_searcher_test {
         let mut ts = TextSearcher::new();
         let mut ids = Vec::new();
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
-            ts.add_keyword(String::from(*keyword), None);
+            ts.add_keyword(keyword.to_string(), None);
             ids.push(ts.nodes.len());
         }
 
@@ -495,20 +578,20 @@ mod text_searcher_test {
     fn test_match1() {
         let mut ts = TextSearcher::new();
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
-            ts.add_keyword(String::from(*keyword), None);
+            ts.add_keyword(keyword.to_string(), None);
         }
         ts.create_blues();
 
         assert_eq!(
             ts.match_("abccab"),
             [
-                (String::from("a"), 0, 1),
-                (String::from("ab"), 0, 2),
-                (String::from("bc"), 1, 3),
-                (String::from("c"), 2, 3),
-                (String::from("c"), 3, 4),
-                (String::from("a"), 4, 5),
-                (String::from("ab"), 4, 6)
+                ("a".to_string(), 0, 1),
+                ("ab".to_string(), 0, 2),
+                ("bc".to_string(), 1, 3),
+                ("c".to_string(), 2, 3),
+                ("c".to_string(), 3, 4),
+                ("a".to_string(), 4, 5),
+                ("ab".to_string(), 4, 6)
             ]
         );
     }
@@ -517,16 +600,16 @@ mod text_searcher_test {
     fn test_match2() {
         let mut ts = TextSearcher::new();
         for keyword in &["北京", "欢迎", "你"] {
-            ts.add_keyword(String::from(*keyword), None);
+            ts.add_keyword(keyword.to_string(), None);
         }
         ts.create_blues();
 
         assert_eq!(
             ts.match_("北京欢迎你"),
             [
-                (String::from("北京"), 0, 2),
-                (String::from("欢迎"), 2, 4),
-                (String::from("你"), 4, 5),
+                ("北京".to_string(), 0, 2),
+                ("欢迎".to_string(), 2, 4),
+                ("你".to_string(), 4, 5),
             ]
         );
     }
@@ -535,18 +618,36 @@ mod text_searcher_test {
     fn test_match3() {
         let mut ts = TextSearcher::new();
         for keyword in &["bcdef", "defghi", "hijk"] {
-            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
+            ts.add_keyword(keyword.to_string(), Some(format!("x{}y", keyword)));
         }
         ts.create_blues();
 
         assert_eq!(
             ts.match_("abcdefghijklmn"),
             [
-                (String::from("xbcdefy"), 1, 6),
-                (String::from("xdefghiy"), 3, 9),
-                (String::from("xhijky"), 7, 11)
+                ("xbcdefy".to_string(), 1, 6),
+                ("xdefghiy".to_string(), 3, 9),
+                ("xhijky".to_string(), 7, 11)
             ]
         );
+    }
+
+    #[test]
+    fn test_match_line() {
+        let mut ts = TextSearcher::new();
+        for keyword in &["abc", "def"] {
+            ts.add_keyword(keyword.to_string(), None);
+        }
+        ts.create_blues();
+
+        assert_eq!(
+            ts.match_line("...\n.abc.\n\n---def---\n...\nabc"),
+            [
+                (".abc.".to_string(), 1, 4),
+                ("---def---".to_string(), 3, 6),
+                ("abc".to_string(), 0, 3)
+            ]
+        )
     }
 
     #[test]
@@ -556,14 +657,93 @@ mod text_searcher_test {
         assert_eq!(ts.blacks.len(), 0);
         assert_eq!(ts.blues.len(), 0);
 
-        assert_eq!(ts.nodes[0].to_string(), "[], , false");
+        assert_eq!(ts.nodes[0].to_string(), "[]/0, , false");
+    }
+
+    #[test]
+    fn test_serde() {
+        let mut ts = TextSearcher::new();
+        for keyword in &["a", "ab", "bab"] {
+            ts.add_keyword(keyword.to_string(), Some(format!("{}!", keyword)));
+        }
+        ts.create_blues();
+
+        let text = serde_json::to_string(&TextSearcherForSerde::from(&ts)).unwrap();
+        assert_eq!(
+            text.len(),
+            "{\"nodes\":
+                [
+                    {
+                        \"letters\":[],
+                        \"length\":0,
+                        \"name\":\"\",
+                        \"is_blue\":false
+                    },
+                    {
+                        \"letters\":[],
+                        \"length\":1,
+                        \"name\":\"a!\",
+                        \"is_blue\":true
+                    },
+                    {
+                        \"letters\":[],
+                        \"length\":2,
+                        \"name\":\"ab!\",
+                        \"is_blue\":true
+                    },
+                    {
+                        \"letters\":[],
+                        \"length\":1,
+                        \"name\":\"\",
+                        \"is_blue\":false
+                    },
+                    {
+                        \"letters\":[],
+                        \"length\":2,
+                        \"name\":\"\",
+                        \"is_blue\":false
+                    },
+                    {
+                        \"letters\":[],
+                        \"length\":3,
+                        \"name\":\"bab!\",
+                        \"is_blue\":true
+                    }
+                ],
+                \"blacks\":
+                [
+                    [[2,\"b\"],3],
+                    [[1,\"b\"],4],
+                    [[1,\"a\"],2],
+                    [[5,\"b\"],6],
+                    [[4,\"a\"],5]
+                ],
+                \"blues\":
+                [
+                    [3,4],
+                    [6,3],
+                    [5,2]
+                ]
+            }"
+            .replace("\n", "")
+            .replace(" ", "")
+            .len() // HashMap::keys(), values(), iter() 不保证顺序
+        );
+
+        let ts = serde_json::from_str::<TextSearcherForSerde>(&text)
+            .unwrap()
+            .to();
+        assert_eq!(ts.nodes.len(), 6);
+        assert_eq!(ts.blacks.len(), 5);
+        assert_eq!(ts.blues.len(), 3);
+        assert_eq!(ts.nodes[5].to_string(), "[]/3, bab!, true");
     }
 
     #[test]
     fn test_subst1() {
         let mut ts = TextSearcher::new();
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
-            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
+            ts.add_keyword(keyword.to_string(), Some(format!("x{}y", keyword)));
         }
         ts.create_blues();
 
@@ -574,7 +754,7 @@ mod text_searcher_test {
     fn test_subst2() {
         let mut ts = TextSearcher::new();
         for keyword in &["bcdef", "defghi", "hijk"] {
-            ts.add_keyword(String::from(*keyword), Some(format!("x{}y", keyword)));
+            ts.add_keyword(keyword.to_string(), Some(format!("x{}y", keyword)));
         }
         ts.create_blues();
 
@@ -585,11 +765,36 @@ mod text_searcher_test {
     fn test_subst3() {
         let mut ts = TextSearcher::new();
         for keyword in &["bdpk", "dpk"] {
-            ts.add_keyword(String::from(*keyword), Some("_keyword_".to_string()));
+            ts.add_keyword(keyword.to_string(), Some("_keyword_".to_string()));
         }
         ts.create_blues();
 
         assert_eq!(ts.subst("abdpkz"), "a_keyword_z");
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TextSearcherForSerde {
+    nodes: Vec<KeywordNode>,
+    blacks: Vec<((usize, char), usize)>,
+    blues: Vec<(usize, usize)>,
+}
+
+impl TextSearcherForSerde {
+    fn from(ts: &TextSearcher) -> Self {
+        Self {
+            nodes: ts.nodes.clone(),
+            blacks: ts.blacks.iter().map(|(&k, &v)| (k, v)).collect(),
+            blues: ts.blues.iter().map(|(&k, &v)| (k, v)).collect(),
+        }
+    }
+
+    fn to(self) -> TextSearcher {
+        TextSearcher {
+            nodes: self.nodes,
+            blacks: self.blacks.iter().map(|&x| x).collect(),
+            blues: self.blues.iter().map(|&x| x).collect(),
+        }
     }
 }
 
@@ -682,6 +887,7 @@ fn text_search_ex_match(
     python: Python,
     tsid: i32,
     text: &str,
+    option: &str,
 ) -> Result<Vec<(String, usize, usize)>, PyErr> {
     let mut tsm = TSM
         .lock()
@@ -691,7 +897,10 @@ fn text_search_ex_match(
         .get_text_searcher(tsid)
         .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
 
-    let result = ts.match_(text);
+    let result = match option {
+        "l" => ts.match_line(text),
+        _ => ts.match_(text),
+    };
     tsm.add_text_searcher(tsid, ts);
 
     Ok(result)
@@ -793,7 +1002,10 @@ pub fn module_initializer(python: Python, module: &PyModule) -> Result<(), PyErr
     module.add(
         python,
         "text_search_ex_match",
-        py_fn!(python, text_search_ex_match(tsid: i32, text: &str)),
+        py_fn!(
+            python,
+            text_search_ex_match(tsid: i32, text: &str, option: &str)
+        ),
     )?;
 
     // 查找/替换, 按 char 切分, 替换

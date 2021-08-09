@@ -1,11 +1,13 @@
+import codecs
+import contextlib
+import os
 import random
 import re
+import shutil
 import string
+import sys
 import time
 from itertools import chain
-import shutil
-import os
-import contextlib
 
 from flashtext.keyword import KeywordProcessor
 
@@ -30,13 +32,7 @@ copy_target_as_pyd()
 import python_comm
 
 
-# 创建随机单词
-def generate_random_word_of_length(str_length):
-    return ''.join(
-        random.choice(string.ascii_lowercase) for _ in range(str_length))
-
-
-def main(story_size):
+def benchmark(story_size):
     # 创建随机单词
     all_words = [
         generate_random_word_of_length(random.choice([3, 4, 5, 6, 7, 8]))
@@ -80,6 +76,10 @@ def main(story_size):
         t2 = time.time()
         r3 = python_comm.text_search_ex_subst(tsid, story)
         t3 = time.time()
+        r4 = python_comm.text_search_ex_match(tsid, story, "")
+        t4 = time.time()
+
+        python_comm.text_search_ex_free(tsid)
 
         # 汇总
         print(
@@ -92,6 +92,8 @@ def main(story_size):
             "{0:.5f}".format(t2 - t1).rjust(9),
             '|',
             "{0:.5f}".format(t3 - t2).rjust(9),
+            '|',
+            "{0:.5f}".format(t4 - t3).rjust(9),
         )
 
         # 校验
@@ -103,5 +105,25 @@ def main(story_size):
         #     return
 
 
+# 创建随机单词
+def generate_random_word_of_length(str_length):
+    return ''.join(
+        random.choice(string.ascii_lowercase) for _ in range(str_length))
+
+
+def test():
+    if len(sys.argv) >= 3:
+        with codecs.open(sys.argv[1], 'r', 'utf-8') as ifile:
+            text = ifile.read()
+
+    # 初始化 TextSearch
+    tsid = python_comm.text_search_ex_init([(x, None) for x in sys.argv[2:]])
+    for line, _, _ in python_comm.text_search_ex_match(tsid, text, "l"):
+        print(line)
+
+    python_comm.text_search_ex_free(tsid)
+
+
 if __name__ == '__main__':
-    main(50000)
+    benchmark(200000)
+    test()
