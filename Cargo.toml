@@ -1,6 +1,6 @@
 [package]
 name = "python_comm"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["wugifer <wugifer@>"]
 edition = "2018"
 description = "to make writing python modules with rust easier."
@@ -28,7 +28,7 @@ pprof              = { version = "~0.5", features = ["flamegraph"] }
 rust_decimal_macros = "~1.12"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["lib", "cdylib"]
 
 [profile.release]
 codegen-units = 1
