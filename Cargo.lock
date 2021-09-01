@@ -435,7 +435,7 @@ dependencies = [
 
 [[package]]
 name = "python_comm"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "ahash 0.7.4",
  "anyhow",

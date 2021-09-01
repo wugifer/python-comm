@@ -363,6 +363,16 @@ macro_rules! to_py {
             .and_then(|object| to_py!($func, $py, $obj, $factory, ($field, object)))
     };
 
+    // 展开式, 内置类型
+    ( $func:ident, $py:expr, $obj:expr, $factory:expr, ($field:expr, $value:expr, $any:tt) ) => {
+        {
+            let __func__ = "to_py!";
+            $obj.$func($py, $field, $value).or_else(
+                |err| raise_error!(__func__, $field, "\n", err)
+            ).and_then(|x| Ok(()))
+        }
+    };
+    
     // 展开式, 无类型
     ( $func:ident, $py:expr, $obj:expr, $factory:expr, ($field:expr, $value:expr) ) => {
         {
