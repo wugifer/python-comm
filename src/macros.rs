@@ -70,7 +70,7 @@ macro_rules! crate_version {
 /// assert_eq!(default, "default");
 /// ```
 ///
-/// 参考 https://danielkeep.github.io/tlborm/book/mbe-min-captures-and-expansion-redux.html
+/// 参考 <https://danielkeep.github.io/tlborm/book/mbe-min-captures-and-expansion-redux.html>
 /// 一旦被捕获, 则不能再当作一般文本进行 match, ident/tt 除外
 /// stringify 是内置的, 不能被 tt 匹配, 必须用 expr
 #[macro_export]
