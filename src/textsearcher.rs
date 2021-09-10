@@ -167,7 +167,7 @@ mod keyword_node_test {
 /// let mut ts1 = TextSearcher::new();
 /// for (keyword, title) in &[("bcdef", "X"), ("defghi", "Y"), ("hijk", "Z")] {
 ///     ts0.add_keyword(keyword.to_string(), None);
-///     ts1.add_keyword(keyword.to_string(), Some(title)).to_string();
+///     ts1.add_keyword(keyword.to_string(), Some(title.to_string()));
 /// }
 /// ts0.create_blues();
 /// ts1.create_blues();

@@ -31,13 +31,13 @@ macro_rules! crate_version {
 /// let pobj: PyObject = os.get(py, "environ").unwrap().extract(py).unwrap();
 ///
 /// // 用法1：从 python obj 中提取指定字段, 其中 obj 是关键字
-/// let pdict:PyDict = from_py!(py, obj, pobj, "_data").unwrap();
-/// let error:Result<PyDict, _> = from_py!(py, obj, pobj, "none");
+/// let pdict:PyDict = from_py!(py, obj, pobj, "_data",).unwrap();
+/// let error:Result<PyDict, _> = from_py!(py, obj, pobj, "none",);
 /// assert!(error.is_err());
 ///
 /// // 用法2：从 python dict 中提取指定字段, 其中 dict 是关键字
 /// // let path:String = from_py!(py, dict, pdict, "PATH").unwrap(); linux 下是 b'PATH' 为 key
-/// let error:Result<String, _> = from_py!(py, dict, pdict, "none");
+/// let error:Result<String, _> = from_py!(py, dict, pdict, "none",);
 /// assert!(error.is_err());
 ///
 /// let locals = PyDict::new(py);
@@ -65,27 +65,42 @@ macro_rules! crate_version {
 /// let text = from_py!(py, dict, pdict, "text", String).unwrap();
 /// assert_eq!(text, "abc");
 ///
-/// // 用法6：在用法 1-5 基础上指定缺省值, 注意 default 前后不需要逗号
-/// let default = from_py!(py, dict, pdict, "none" default String::from("default")).unwrap();
+/// // 用法6：在用法 1-5 基础上指定缺省值
+/// let default = from_py!(py, dict, pdict, "none", default String::from("default")).unwrap();
 /// assert_eq!(default, "default");
 /// ```
 ///
+/// 参考 https://danielkeep.github.io/tlborm/book/mbe-min-captures-and-expansion-redux.html
+/// 一旦被捕获, 则不能再当作一般文本进行 match, ident/tt 除外
+/// stringify 是内置的, 不能被 tt 匹配, 必须用 expr
 #[macro_export]
 macro_rules! from_py {
-    // 0. 从 dict 中提取
-    ( $py:tt, dict, $($any:tt),+ ) => {
-        from_py!(get_item, take, $py, $($any,)+)
+    // - 从 dict 中提取
+    ( $py:tt, dict, $obj:tt, $any1:expr, default $default:expr ) => {
+        from_py!(0 get_item, take, $py, $obj, $any1, default $default)
     };
 
-    // 1. 从 obj 中提取
-    ( $py:tt, obj, $($any:tt),+ ) => {
-        from_py!(getattr, ok, $py, $($any,)+)
+    // - 从 dict 中提取
+    // expr 之后必须是逗号, 因此 any2 即使没有, 也需要前面的逗号
+    ( $py:tt, dict, $obj:tt, $any1:expr, $($any2:tt),* ) => {
+        from_py!(0 get_item, take, $py, $obj, $any1, $($any2),*)
     };
 
-    // *.0. 指定缺省值
-    ( $($any:tt),+ default $default:expr $(,)* ) => {
+    // - 从 obj 中提取
+    ( $py:tt, obj, $obj:tt, $any1:expr, default $default:expr ) => {
+        from_py!(0 getattr, ok, $py, $obj, $any1, default $default)
+    };
+
+    // - 从 obj 中提取
+    // expr 之后必须是逗号, 因此 any2 即使没有, 也需要前面的逗号
+    ( $py:tt, obj, $obj:tt, $any1:expr, $($any2:tt),* ) => {
+        from_py!(0 getattr, ok, $py, $obj, $any1, $($any2),*)
+    };
+
+    // 0 - 指定缺省值
+    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, default $default:expr ) => {
         {
-            let ret: Result<_, anyhow::Error> = match from_py!($($any),+) {
+            let ret: Result<_, anyhow::Error> = match from_py!(0 $fn1, $fn2, $py, $obj, $field,) {
                 Ok(object) => Ok(object),
                 Err(_) => Ok($default),
             };
@@ -93,17 +108,9 @@ macro_rules! from_py {
         }
     };
 
-    // *.*.*.0. 提取指定字段
-    ( raw, $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr ) => {
-        $obj.$fn1($py, $field).$fn2().ok_or_else(|| {
-            let __func__ = "from_py!";
-            raise_error!(__func__, format!("获取 {} 字段失败", $field))
-        });
-    };
-
-    // *.*.0. 不指定类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr $(,)* ) => {
-        from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
+    // 0 - 不指定类型
+    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, ) => {
+        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object.extract($py).or_else(|err| {
                 let __func__ = "from_py!";
                 raise_error!(__func__, format!("解析 {} 字段失败", $field), "\n", err)
@@ -111,9 +118,9 @@ macro_rules! from_py {
         })
     };
 
-    // *.*.1. 指定 datetime 类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, datetime $(,)* ) => {
-        from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
+    // 0 - 指定 datetime 类型
+    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, datetime ) => {
+        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object
                 .call_method($py, "timestamp", cpython::NoArgs, None)
                 .or_else(|err| {
@@ -136,9 +143,9 @@ macro_rules! from_py {
         })
     };
 
-    // *.*.2. 指定 Decimal 类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, Decimal $(,)* ) => {
-        from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
+    // 0 - 指定 Decimal 类型
+    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, Decimal ) => {
+        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object
                 .call_method($py, "as_integer_ratio", cpython::NoArgs, None)
                 .or_else(|err| {
@@ -174,14 +181,22 @@ macro_rules! from_py {
         })
     };
 
-    // *.*.3. 指定其它类型
-    ( $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, $type:ty $(,)* ) => {
-        from_py!(raw, $fn1, $fn2, $py, $obj, $field).and_then(|object| {
+    // 0 - 指定其它类型
+    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, $type:ty ) => {
+        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
             object.extract::<$type>($py).or_else(|err| {
                 let __func__ = "from_py!";
                 raise_error!(__func__, $field, "\n", err)
             })
         })
+    };
+
+    // 1 - 提取指定字段
+    ( 1 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr ) => {
+        $obj.$fn1($py, $field).$fn2().ok_or_else(|| {
+            let __func__ = "from_py!";
+            raise_error!(__func__, format!("获取 {} 字段失败", $field))
+        });
     };
 }
 
@@ -295,10 +310,10 @@ macro_rules! raise_error {
 ///     Some(&locals),
 /// ).unwrap();
 ///
-/// let some:PyObject = from_py!(py, dict, locals, "some").unwrap();
-/// let factory:PyObject = from_py!(py, dict, locals, "factory").unwrap();
+/// let some:PyObject = from_py!(py, dict, locals, "some",).unwrap();
+/// let factory:PyObject = from_py!(py, dict, locals, "factory",).unwrap();
 ///
-/// let a:i32 = from_py!(py, obj, some, "a").unwrap();
+/// let a:i32 = from_py!(py, obj, some, "a",).unwrap();
 /// assert_eq!(a, 1);
 ///
 /// // 用法1：设置 python obj 中指定字段, 其中 obj 是关键字
@@ -306,7 +321,7 @@ macro_rules! raise_error {
 ///     ("a", 2),
 ///     ("b", 3),
 /// ]).unwrap();
-/// let a:i32 = from_py!(py, obj, some, "a").unwrap();
+/// let a:i32 = from_py!(py, obj, some, "a",).unwrap();
 /// assert_eq!(a, 2);
 ///
 /// // 用法2：设置 python dict 中指定字段, 其中 dict 是关键字
@@ -372,7 +387,6 @@ macro_rules! to_py {
             ).and_then(|x| Ok(()))
         }
     };
-    
     // 展开式, 无类型
     ( $func:ident, $py:expr, $obj:expr, $factory:expr, ($field:expr, $value:expr) ) => {
         {
