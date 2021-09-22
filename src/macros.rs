@@ -1,12 +1,12 @@
-/// 当前版本号
+/// Current version number
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 ///
 /// let version = crate_version!();
-/// assert_eq!(&version[0..3], "0.1");
+/// assert_eq!(&version[0..3], "0.2");
 /// ```
 ///
 #[macro_export]
@@ -16,91 +16,95 @@ macro_rules! crate_version {
     };
 }
 
-/// 从 python dict/obj 中提取指定字段
+/// Extract the specified field from Python dict / obj
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use cpython::{Python, PyDict, PyObject};
-/// use python_comm::prelude::*;
+/// use pyo3::{prepare_freethreaded_python, Python};
+/// use python_comm::{from_py_use::*, raise_error_use::*};
 /// use rust_decimal_macros::dec;
+///
+/// prepare_freethreaded_python();
 ///
 /// let gil = Python::acquire_gil();
 /// let py = gil.python();
 /// let os = py.import("os").unwrap();
-/// let pobj: PyObject = os.get(py, "environ").unwrap().extract(py).unwrap();
+/// let pobj: &PyAny = os.getattr("environ").unwrap().extract().unwrap();
 ///
-/// // 用法1：从 python obj 中提取指定字段, 其中 obj 是关键字
-/// let pdict:PyDict = from_py!(py, obj, pobj, "_data",).unwrap();
-/// let error:Result<PyDict, _> = from_py!(py, obj, pobj, "none",);
+/// // Usage 1: extract the specified field from Python obj, where obj is a keyword
+/// let pdict: &PyDict = from_py!(obj, pobj, "_data",).unwrap();
+/// let error: Result<&PyDict, _> = from_py!(obj, pobj, "none",);
 /// assert!(error.is_err());
 ///
-/// // 用法2：从 python dict 中提取指定字段, 其中 dict 是关键字
-/// // let path:String = from_py!(py, dict, pdict, "PATH").unwrap(); linux 下是 b'PATH' 为 key
-/// let error:Result<String, _> = from_py!(py, dict, pdict, "none",);
+/// // Usage 2: extract the specified field from Python dict, where dict is a keyword
+/// // let path:String = from_py!(dict, pdict, "PATH").unwrap(); under linux the key is b'PATH'
+/// let error:Result<String, _> = from_py!(dict, pdict, "none",);
 /// assert!(error.is_err());
 ///
 /// let locals = PyDict::new(py);
-/// locals.set_item(py, "decimal", py.import("decimal").unwrap()).unwrap();
-/// locals.set_item(py, "datetime", py.import("datetime").unwrap()).unwrap();
-/// let pdict:PyDict = py
+/// locals.set_item("decimal", py.import("decimal").unwrap()).unwrap();
+/// locals.set_item("datetime", py.import("datetime").unwrap()).unwrap();
+/// let pdict: &PyDict = py
 ///     .eval(
 ///         r#"{"time": datetime.datetime.now(), "num": decimal.Decimal('2.5'), "text": "abc"}"#,
 ///         None,
 ///         Some(&locals),
 ///     )
 ///     .unwrap()
-///     .extract(py)
+///     .extract()
 ///     .unwrap();
 ///
-/// // 用法3：在用法 1-2 基础上指定 datetime 类型
-/// let time = from_py!(py, dict, pdict, "time", datetime).unwrap();
+/// // Usage 3: specify datetime type based on usage 1-2
+/// let time = from_py!(dict, pdict, "time", datetime).unwrap();
 /// assert!(time.date().year() >= 2021);
 ///
-/// // 用法4：在用法 1-2 基础上指定 Decimal 类型
-/// let num = from_py!(py, dict, pdict, "num", Decimal).unwrap();
+/// // Usage 4: specify Decimal type based on usage 1-2
+/// let num = from_py!(dict, pdict, "num", Decimal).unwrap();
 /// assert_eq!(num, dec!(2.5));
 ///
-/// // 用法5：在用法 1-2 基础上指定 其它 类型
-/// let text = from_py!(py, dict, pdict, "text", String).unwrap();
+/// // Usage 5: specify other type based on usage 1-2
+/// let text = from_py!(dict, pdict, "text", String).unwrap();
 /// assert_eq!(text, "abc");
 ///
-/// // 用法6：在用法 1-5 基础上指定缺省值
-/// let default = from_py!(py, dict, pdict, "none", default String::from("default")).unwrap();
+/// // Usage 6: specify the default value based on usage 1-5
+/// let default = from_py!(dict, pdict, "none", default String::from("default")).unwrap();
 /// assert_eq!(default, "default");
 /// ```
 ///
-/// 参考 <https://danielkeep.github.io/tlborm/book/mbe-min-captures-and-expansion-redux.html>
-/// 一旦被捕获, 则不能再当作一般文本进行 match, ident/tt 除外
-/// stringify 是内置的, 不能被 tt 匹配, 必须用 expr
+/// See <https://danielkeep.github.io/tlborm/book/mbe-min-captures-and-expansion-redux.html>
+///
+/// Once captured, it can no longer be matched as general text, except ident / TT
+///
+/// Stringify is built-in and cannot be matched by TT. Expr must be used
 #[macro_export]
 macro_rules! from_py {
     // - 从 dict 中提取
-    ( $py:tt, dict, $obj:tt, $any1:expr, default $default:expr ) => {
-        from_py!(0 get_item, take, $py, $obj, $any1, default $default)
+    ( dict, $obj:tt, $any1:expr, default $default:expr ) => {
+        from_py!(0 get_item, take, $obj, $any1, default $default)
     };
 
     // - 从 dict 中提取
     // expr 之后必须是逗号, 因此 any2 即使没有, 也需要前面的逗号
-    ( $py:tt, dict, $obj:tt, $any1:expr, $($any2:tt),* ) => {
-        from_py!(0 get_item, take, $py, $obj, $any1, $($any2),*)
+    ( dict, $obj:tt, $any1:expr, $($any2:tt),* ) => {
+        from_py!(0 get_item, take, $obj, $any1, $($any2),*)
     };
 
     // - 从 obj 中提取
-    ( $py:tt, obj, $obj:tt, $any1:expr, default $default:expr ) => {
-        from_py!(0 getattr, ok, $py, $obj, $any1, default $default)
+    ( obj, $obj:tt, $any1:expr, default $default:expr ) => {
+        from_py!(0 getattr, ok, $obj, $any1, default $default)
     };
 
     // - 从 obj 中提取
     // expr 之后必须是逗号, 因此 any2 即使没有, 也需要前面的逗号
-    ( $py:tt, obj, $obj:tt, $any1:expr, $($any2:tt),* ) => {
-        from_py!(0 getattr, ok, $py, $obj, $any1, $($any2),*)
+    ( obj, $obj:tt, $any1:expr, $($any2:tt),* ) => {
+        from_py!(0 getattr, ok, $obj, $any1, $($any2),*)
     };
 
     // 0 - 指定缺省值
-    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, default $default:expr ) => {
+    ( 0 $fn1:ident, $fn2:ident, $obj:ident, $field:expr, default $default:expr ) => {
         {
-            let ret: Result<_, anyhow::Error> = match from_py!(0 $fn1, $fn2, $py, $obj, $field,) {
+            let ret: Result<_, anyhow::Error> = match from_py!(0 $fn1, $fn2, $obj, $field,) {
                 Ok(object) => Ok(object),
                 Err(_) => Ok($default),
             };
@@ -109,9 +113,9 @@ macro_rules! from_py {
     };
 
     // 0 - 不指定类型
-    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, ) => {
-        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
-            object.extract($py).or_else(|err| {
+    ( 0 $fn1:ident, $fn2:ident, $obj:ident, $field:expr, ) => {
+        from_py!(1 $fn1, $fn2, $obj, $field).and_then(|object| {
+            object.extract().or_else(|err| {
                 let __func__ = "from_py!";
                 raise_error!(__func__, format!("解析 {} 字段失败", $field), "\n", err)
             })
@@ -119,22 +123,22 @@ macro_rules! from_py {
     };
 
     // 0 - 指定 datetime 类型
-    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, datetime ) => {
-        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
+    ( 0 $fn1:ident, $fn2:ident, $obj:ident, $field:expr, datetime ) => {
+        from_py!(1 $fn1, $fn2, $obj, $field).and_then(|object| {
             object
-                .call_method($py, "timestamp", cpython::NoArgs, None)
+                .call_method("timestamp", (), None)
                 .or_else(|err| {
                     let __func__ = "from_py!";
                     raise_error!(__func__, $field, "\n", err)
                 })
                 .and_then(|tm_object| {
-                    tm_object.extract::<f64>($py).or_else(|err| {
+                    tm_object.extract::<f64>().or_else(|err| {
                         let __func__ = "from_py!";
                         raise_error!(__func__, $field, "\n", err)
                     })
                 })
                 .and_then(|timestamp| {
-                    python_comm::prelude::bjtc_ft(timestamp)
+                    python_comm::basic_use::bjtc_ft(timestamp)
                         .or_else(|err| {
                             let __func__ = "from_py!";
                             raise_error!(__func__, $field, "\n", err)
@@ -144,17 +148,17 @@ macro_rules! from_py {
     };
 
     // 0 - 指定 Decimal 类型
-    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, Decimal ) => {
-        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
+    ( 0 $fn1:ident, $fn2:ident, $obj:ident, $field:expr, Decimal ) => {
+        from_py!(1 $fn1, $fn2, $obj, $field).and_then(|object| {
             object
-                .call_method($py, "as_integer_ratio", cpython::NoArgs, None)
+                .call_method("as_integer_ratio", (), None)
                 .or_else(|err| {
                     let __func__ = "from_py!";
                     raise_error!(__func__, $field, "\n", err)
                 })
                 .and_then(|ratio_object| {
                     ratio_object
-                        .extract::<(i64, i64)>($py)
+                        .extract::<(i64, i64)>()
                         .or_else(|err| {
                             let __func__ = "from_py!";
                             raise_error!(__func__, $field, "\n", err)
@@ -182,9 +186,9 @@ macro_rules! from_py {
     };
 
     // 0 - 指定其它类型
-    ( 0 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr, $type:ty ) => {
-        from_py!(1 $fn1, $fn2, $py, $obj, $field).and_then(|object| {
-            object.extract::<$type>($py).or_else(|err| {
+    ( 0 $fn1:ident, $fn2:ident, $obj:ident, $field:expr, $type:ty ) => {
+        from_py!(1 $fn1, $fn2, $obj, $field).and_then(|object| {
+            object.extract::<$type>().or_else(|err| {
                 let __func__ = "from_py!";
                 raise_error!(__func__, $field, "\n", err)
             })
@@ -192,22 +196,24 @@ macro_rules! from_py {
     };
 
     // 1 - 提取指定字段
-    ( 1 $fn1:ident, $fn2:ident, $py:ident, $obj:ident, $field:expr ) => {
-        $obj.$fn1($py, $field).$fn2().ok_or_else(|| {
+    ( 1 $fn1:ident, $fn2:ident, $obj:ident, $field:expr ) => {
+        $obj.$fn1($field).$fn2().ok_or_else(|| {
             let __func__ = "from_py!";
             raise_error!(__func__, format!("获取 {} 字段失败", $field))
         });
     };
 }
 
-/// 生成带文件名、行号、函数的 cpython::PyErr 或 anyhow::Error
+/// Generate pyo3:: pyerr or anyhow:: error with file name, line number and function
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use cpython::Python;
-/// use python_comm::prelude::*;
+/// use pyo3::{prepare_freethreaded_python, Python};
+/// use python_comm::raise_error_use::*;
 /// use python_comm_macros::auto_func_name;
+///
+/// prepare_freethreaded_python();
 ///
 /// let gil = Python::acquire_gil();
 /// let py = gil.python();
@@ -216,32 +222,31 @@ macro_rules! from_py {
 /// fn test(py:Python) -> Result<(), anyhow::Error> {
 ///   let v = Ok(2).and(Err("e"));
 ///
-///   // 用法1：生成 cpython::PyErr
-///   let _a = v.or_else(|err| raise_error!(py, __func__, "some text", "\n", err));
+///   // Usage 1: generate pyo3::PyErr
+///   let _a = v.or_else(|err| raise_error!("py", __func__, "some text", "\n", err));
 ///
-///   // 用法2：生成 anyhow::Error, 包含补充说明及另一个 error
+///   // Usage 2: generate anyhow::Error, including supplementary instruction and another error
 ///   let b = v.or_else(|err| raise_error!(__func__, "some text", "\n", err));
 ///
-///   // 用法3：生成 anyhow::Error, 包含另一个 error
+///   // Usage 3: generate anyhow::Error, including another error
 ///   let _c = v.or_else(|err| raise_error!(__func__, "\n", err));
 ///
-///   // 用法3：生成 anyhow::Error, 补充说明
+///   // Usage 4: generate anyhow::Error, including supplementary description
 ///   let _d = v.or_else(|_err| Err(raise_error!(__func__, "some text")));
 ///
 ///   b
 /// }
 ///
 /// let err = format!("{:?}", test(py).err().unwrap());
-/// let msg1 = "Error: src\\macros.rs:19 test() some text\n\"e\"";
-/// let msg2 = "Error: src/macros.rs:19 test() some text\n\"e\"";
+/// let msg1 = "Error: src\\macros.rs:21 test() some text\n\"e\"";
+/// let msg2 = "Error: src/macros.rs:21 test() some text\n\"e\"";
 /// assert!(err == msg1 || err == msg2, "\n left: {:?}\n  msg1:{:?}\n  msg2:{:?}", err, msg1, msg2);
 /// ```
 ///
 #[macro_export]
 macro_rules! raise_error {
-    ($python:expr, $func:ident, $text:expr, "\n", $err:expr) => {
-        Err(cpython::PyErr::new::<cpython::exc::Exception, _>(
-            $python,
+    ("py", $func:ident, $text:expr, "\n", $err:expr) => {
+        Err(pyo3::PyErr::new::<pyo3::exceptions::PyException, _>(
             format!(
                 "Some error in rust.\nError: {}:{} {}() {}\n{:?}",
                 file!(),
@@ -276,14 +281,16 @@ macro_rules! raise_error {
     };
 }
 
-/// 设置 python dict/obj 中指定字段
+/// Set the specified fields in Python dict / obj
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use cpython::{Python, PyDict, PyObject};
-/// use python_comm::prelude::*;
+/// use pyo3::{prepare_freethreaded_python, Python};
+/// use python_comm::{from_py_use::*, raise_error_use::*, to_py_use::*};
 /// use rust_decimal_macros::dec;
+///
+/// prepare_freethreaded_python();
 ///
 /// let gil = Python::acquire_gil();
 /// let py = gil.python();
@@ -310,30 +317,32 @@ macro_rules! raise_error {
 ///     Some(&locals),
 /// ).unwrap();
 ///
-/// let some:PyObject = from_py!(py, dict, locals, "some",).unwrap();
-/// let factory:PyObject = from_py!(py, dict, locals, "factory",).unwrap();
+/// let some: &PyAny = from_py!(dict, locals, "some",).unwrap();
+/// let factory: &PyAny = from_py!(dict, locals, "factory",).unwrap();
 ///
-/// let a:i32 = from_py!(py, obj, some, "a",).unwrap();
+/// let a:i32 = from_py!(obj, some, "a",).unwrap();
 /// assert_eq!(a, 1);
 ///
-/// // 用法1：设置 python obj 中指定字段, 其中 obj 是关键字
+/// // Usage 1: set the specified field in Python obj, where obj is a keyword
 /// let _ = to_py!(py, obj, some, [
 ///     ("a", 2),
 ///     ("b", 3),
 /// ]).unwrap();
-/// let a:i32 = from_py!(py, obj, some, "a",).unwrap();
+/// let a:i32 = from_py!(obj, some, "a",).unwrap();
 /// assert_eq!(a, 2);
 ///
-/// // 用法2：设置 python dict 中指定字段, 其中 dict 是关键字
+/// // Usage 2: set the specified field in Python dict, where dict is a keyword
 ///
-/// // 用法3：在用法 1-2 基础上指定 Decimal 类型, 需要提供一个实现了 create_decimal 的 factory 对象
+/// // Usage 3: specify decimal type on the basis of usage 1-2,
+/// // need to provide a factory object that implements create_decimal()
 /// let _ = to_py!(py, obj, some, factory, [
 ///     ("a", dec!(2.5), Decimal)
 /// ]).unwrap();
-/// let a = from_py!(py, obj, some, "a", Decimal).unwrap();
+/// let a = from_py!(obj, some, "a", Decimal).unwrap();
 /// assert_eq!(a, dec!(2.5));
 ///
-/// // 注：python 3.10 的 decimal 模块支持 Capsule, 可以改为直接创建
+/// // Note: the decimal module of Python 3.10 supports capsule, 
+/// // which can be created directly instead
 /// ```
 ///
 #[macro_export]
@@ -370,7 +379,7 @@ macro_rules! to_py {
     // 展开式, 含类型 Decimal
     ( $func:ident, $py:expr, $obj:expr, $factory:expr, ($field:expr, $value:expr, Decimal) ) => {
         $factory
-            .call_method($py, "create_decimal", ($value.to_string(),), None)
+            .call_method("create_decimal", ($value.to_string(),), None)
             .or_else(|err| {
                 let __func__ = "to_py!";
                 raise_error!(__func__, $field, "\n", err)
@@ -382,16 +391,17 @@ macro_rules! to_py {
     ( $func:ident, $py:expr, $obj:expr, $factory:expr, ($field:expr, $value:expr, $any:tt) ) => {
         {
             let __func__ = "to_py!";
-            $obj.$func($py, $field, $value).or_else(
+            $obj.$func($field, $value).or_else(
                 |err| raise_error!(__func__, $field, "\n", err)
             ).and_then(|x| Ok(()))
         }
     };
+
     // 展开式, 无类型
     ( $func:ident, $py:expr, $obj:expr, $factory:expr, ($field:expr, $value:expr) ) => {
         {
             let __func__ = "to_py!";
-            $obj.$func($py, $field, $value).or_else(
+            $obj.$func($field, $value).or_else(
                 |err| raise_error!(__func__, $field, "\n", err)
             ).and_then(|x| Ok(()))
         }

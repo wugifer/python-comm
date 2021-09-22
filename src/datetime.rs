@@ -1,13 +1,14 @@
 use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, Utc};
-use python_comm_macros::auto_func_name2;
+use python_comm_macros::auto_func_name;
 use std::time;
 
-/// 北京时间, 日期
+/// Beijing time, date only
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use chrono::Datelike;
+/// use python_comm::basic_use::*;
 ///
 /// assert!(bj_date().year() >= 2021);
 /// ```
@@ -17,12 +18,12 @@ pub fn bj_date() -> NaiveDate {
     bj_time().date()
 }
 
-/// 北京时间, 日期, %Y-%m-%d 格式字符串
+/// Beijing time, date only, %Y-%m-%d format string
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 ///
 /// assert!(bj_dates().starts_with("20"));
 /// ````
@@ -32,12 +33,13 @@ pub fn bj_dates() -> String {
     bj_date().format("%Y-%m-%d").to_string()
 }
 
-/// 北京时间, 日期 + 时间
+/// Beijing time, date and time
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use chrono::Timelike;
+/// use python_comm::basic_use::*;
 ///
 /// assert!(bj_time().time().hour() >= 0);
 /// ```
@@ -47,12 +49,12 @@ pub fn bj_time() -> NaiveDateTime {
     (Utc::now() + Duration::hours(8)).naive_utc()
 }
 
-/// 北京时间, 日期 + 时间, %Y-%m-%d %H:%M:%S 格式字符串
+/// Beijing time, date and time, %Y-%m-%d %H:%M:%S format string
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 ///
 /// assert_eq!(bj_times().len(), 19);
 /// ```
@@ -62,12 +64,12 @@ pub fn bj_times() -> String {
     bj_time().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
-/// 北京时间, 时间戳
+/// Beijing time, timestamp
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 ///
 /// let ts = bj_timestamp();
 /// assert!(ts > 1623913021 && ts < 1623913021 + 86400 * 36500);
@@ -78,12 +80,12 @@ pub fn bj_timestamp() -> i64 {
     Utc::now().timestamp()
 }
 
-/// 北京时间, 时间戳, 精确到毫秒
+/// Beijing time, timestamp, accurate to milliseconds
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 ///
 /// let ts = bj_timestamp_millis();
 /// assert!(ts > 1623913021000 && ts < 1623913021000 + 86400000 * 36500);
@@ -94,26 +96,26 @@ pub fn bj_timestamp_millis() -> i64 {
     Utc::now().timestamp_millis()
 }
 
-/// bjtc_xy 北京时间的各种表达方式之间转换
+/// bjtc_xy: Conversion between various expressions of Beijing time, x -> y
 ///
-/// ## 转换类型
+/// ## Conversion type
 ///
-/// x,y 分别是 d,t,s,f,n 之一
+/// x,y is one of d,t,s,f,n
 ///
 /// d: NaiveDate
 ///
 /// t: NaiveDateTime
 ///
-/// s: %Y-%m-%d 或 %Y-%m-%d %H:%M:%S
+/// s: %Y-%m-%d or %Y-%m-%d %H:%M:%S
 ///
-/// f: timestamp 浮点数
+/// f: timestamp float
 ///
-/// n: timestamp 整数
+/// n: timestamp integer
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 ///
 /// let ts = bj_timestamp();
 /// let a = bjtc_nt(ts, 10).unwrap();
@@ -128,19 +130,19 @@ pub fn bjtc_df(date: &NaiveDate) -> f64 {
     bjtc_dn(date) as f64
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
 pub fn bjtc_dn(date: &NaiveDate) -> i64 {
     bjtc_tn(&bjtc_dt(date))
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
 pub fn bjtc_ds(date: &NaiveDate) -> String {
     date.format("%Y-%m-%d").to_string()
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
 pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
     date.and_hms(0, 0, 0)
@@ -148,9 +150,9 @@ pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
 
 // fx
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
     bjtc_nd(
         timestamp as i64,
@@ -159,18 +161,18 @@ pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, anyhow::Error> {
     .or_else(|err| raise_error!(__func__, timestamp, "\n", err))
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_fs(timestamp: f64) -> Result<String, anyhow::Error> {
     Ok(bjtc_ts(&bjtc_ft(timestamp).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
     bjtc_nt(
         timestamp as i64,
@@ -181,27 +183,27 @@ pub fn bjtc_ft(timestamp: f64) -> Result<NaiveDateTime, anyhow::Error> {
 
 // nx
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, anyhow::Error> {
     Ok(bjtc_td(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
     Ok(bjtc_ts(&bjtc_nt(timestamp, millis).or_else(|err| {
         raise_error!(__func__, timestamp, "\n", err)
     })?))
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Error> {
     NaiveDateTime::from_timestamp_opt(timestamp, millis * 1000000)
         .ok_or(raise_error!(__func__, format!("无效时间戳 {}", timestamp)))
@@ -209,17 +211,17 @@ pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Err
 
 // sx
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_sd(text: &String) -> Result<NaiveDate, anyhow::Error> {
     NaiveDate::parse_from_str(text, "%Y-%m-%d")
         .or_else(|err| raise_error!(__func__, text, "\n", err))
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
-#[auto_func_name2]
+#[auto_func_name]
 pub fn bjtc_st(text: &String) -> Result<NaiveDateTime, anyhow::Error> {
     NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S")
         .or_else(|err| raise_error!(__func__, text, "\n", err))
@@ -227,25 +229,25 @@ pub fn bjtc_st(text: &String) -> Result<NaiveDateTime, anyhow::Error> {
 
 // tx
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
 pub fn bjtc_td(time: &NaiveDateTime) -> NaiveDate {
     time.date()
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
 pub fn bjtc_tf(time: &NaiveDateTime) -> f64 {
     bjtc_tn(time) as f64
 }
 
-/// 见 bjtc_dn
+/// See bjtc_dn
 #[inline]
 pub fn bjtc_tn(time: &NaiveDateTime) -> i64 {
     time.timestamp()
 }
 
-/// 见 bjtc_df
+/// See bjtc_df
 #[inline]
 pub fn bjtc_ts(time: &NaiveDateTime) -> String {
     time.format("%Y-%m-%d %H:%M:%S").to_string()
@@ -253,26 +255,26 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 
 //
 
-/// 转换 duration 为 timestamp, 精确到毫秒
+/// Convert duration to timestamp, accurate to milliseconds
 ///
-/// 在同一时刻记录 DateTime 为 anchor, 创建 time::Instant 为 now,
-/// 则在之后的任意时刻
+/// At the same time, record datetime as anchor, create time::instant as now,
+/// then at any time after,
 ///
-/// bjtc_from_duration 转换 now.duration() 为 timestamp,
+/// bjtc_from_duration convert now.duration() to timestamp,
 ///
-/// bjtc_to_duration 转换 timestamp 为 now.duration()
+/// bjtc_to_duration convert timestamp to now.duration()
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// ```
 /// use chrono::Utc;
-/// use python_comm::prelude::*;
+/// use python_comm::basic_use::*;
 /// use std::{thread, time};
 ///
 /// let anchor = Utc::now();
 /// let now = time::Instant::now();
 ///
-/// thread::sleep(time::Duration::from_millis(700));  // 0.7 秒
+/// thread::sleep(time::Duration::from_millis(700));  // 0.7 seconds
 /// let t1 = bjtc_from_duration(&anchor, now.elapsed().as_secs_f64() * 1000.0);
 /// let t2 = bjtc_to_duration(&anchor, t1).unwrap();
 /// let diff = t2.as_secs_f64() - 0.7;
@@ -296,8 +298,8 @@ pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
     (*anchor + chrono::Duration::milliseconds(millis as i64)).timestamp_millis()
 }
 
-/// 转换 timestamp 为 duration
-#[auto_func_name2]
+/// Convert timestamp to duration, see bjtc_from_duration
+#[auto_func_name]
 pub fn bjtc_to_duration(
     anchor: &DateTime<Utc>,
     timestamp_millis: i64,

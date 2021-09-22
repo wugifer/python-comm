@@ -1,6 +1,6 @@
 [package]
 name = "python_comm"
-version = "0.1.10"
+version = "0.2.0"
 authors = ["wugifer <wugifer@>"]
 edition = "2018"
 description = "to make writing python modules with rust easier."
@@ -12,13 +12,15 @@ documentation = "https://docs.rs/python-comm/"
 anyhow             = "~1.0"
 ahash              = "~0.7"
 chrono             = "~0.4"
-cpython            = "~0.6"
 lazy_static        = "~1.4"
-python_comm_macros = "~0.1.5"
+pyo3               = "~0.14"
+python_comm_macros = "~0.2"
 rust_decimal       = "~1.12"
 serde              = { version = "~1.0", features = ["derive"] }
 serde_derive       = "~1.0"
 serde_json         = "~1.0"
+
+# python_comm_macros = { path = "../python-comm-macros" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pprof              = { version = "~0.5", features = ["flamegraph"] }

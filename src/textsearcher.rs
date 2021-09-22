@@ -1,7 +1,8 @@
 use ahash::AHashMap;
-use cpython::{py_fn, PyErr, PyModule, Python};
 use lazy_static::lazy_static;
-use python_comm_macros::auto_func_name2;
+use pyo3::{proc_macro::pyfunction, types::PyModule, wrap_pyfunction, PyErr, Python};
+
+use python_comm_macros::auto_func_name;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, mem::take, sync::Mutex};
 
@@ -74,7 +75,7 @@ mod keyword_node_test {
     }
 }
 
-/// 基于 Aho–Corasick 算法的全文匹配/替换
+/// Full text matching / replacement based on aho Corasick algorithm
 ///
 /// ## Aho–Corasick 算法
 /// Aho–Corasick 算法通过预先定义的字典, 只扫描一遍文本, 可以完成多个关键字的查找、替换。
@@ -150,7 +151,7 @@ mod keyword_node_test {
 ///
 ///  ab     -           -                       蓝点 ab
 ///
-/// ## 用法
+/// ## Usage
 ///
 /// Step1.  ts = TextSearcher::new();
 ///
@@ -161,7 +162,7 @@ mod keyword_node_test {
 /// Step4.  ts.match_() / ts.subst();  // ts 可复用
 ///
 /// ```
-/// use python_comm::prelude::TextSearcher;
+/// use python_comm::basic_use::TextSearcher;
 ///
 /// let mut ts0 = TextSearcher::new();
 /// let mut ts1 = TextSearcher::new();
@@ -277,7 +278,7 @@ impl TextSearcher {
         return node_id;
     }
 
-    #[auto_func_name2]
+    #[auto_func_name]
     pub fn load(text: String) -> Result<Self, anyhow::Error> {
         Ok(serde_json::from_str::<TextSearcherForSerde>(&text)
             .or_else(|err| raise_error!(__func__, "\n", err))?
@@ -405,7 +406,7 @@ impl TextSearcher {
         }
     }
 
-    #[auto_func_name2]
+    #[auto_func_name]
     pub fn save(&self) -> Result<String, anyhow::Error> {
         serde_json::to_string(&TextSearcherForSerde::from(self))
             .or_else(|err| raise_error!(__func__, "\n", err))
@@ -813,7 +814,7 @@ impl TextSearcherManager {
     }
 
     /// 获取 ts
-    #[auto_func_name2]
+    #[auto_func_name]
     fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, anyhow::Error> {
         self.tss
             .remove(&tsid)
@@ -854,12 +855,36 @@ lazy_static! {
     static ref TSM: Mutex<TextSearcherManager> = Mutex::new(TextSearcherManager::new());
 }
 
+/// python 扩展模块初始化
+pub fn initialize(module: &PyModule) -> Result<(), PyErr> {
+    // 查找, 按 u8 切分, 仅用一次
+    module.add_function(wrap_pyfunction!(text_search_match, module)?)?;
+
+    // 替换, 按 char 切分, 仅用一次
+    module.add_function(wrap_pyfunction!(text_search_subst, module)?)?;
+
+    // 查找/替换, 按 char 切分, 初始化
+    module.add_function(wrap_pyfunction!(text_search_ex_init, module)?)?;
+
+    // 查找/替换, 按 char 切分, 查询
+    module.add_function(wrap_pyfunction!(text_search_ex_match, module)?)?;
+
+    // 查找/替换, 按 char 切分, 替换
+    module.add_function(wrap_pyfunction!(text_search_ex_subst, module)?)?;
+
+    // 查找/替换, 按 char 切分, 释放
+    module.add_function(wrap_pyfunction!(text_search_ex_free, module)?)?;
+
+    Ok(())
+}
+
 /// text_search_ex_free 接口
-#[auto_func_name2]
-fn text_search_ex_free(python: Python, tsid: i32) -> Result<i32, PyErr> {
+#[auto_func_name]
+#[pyfunction]
+fn text_search_ex_free(tsid: i32) -> Result<i32, PyErr> {
     let mut tsm = TSM
         .lock()
-        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
 
     tsm.remove_text_searcher(tsid);
 
@@ -867,14 +892,12 @@ fn text_search_ex_free(python: Python, tsid: i32) -> Result<i32, PyErr> {
 }
 
 /// text_search_ex_init 接口
-#[auto_func_name2]
-fn text_search_ex_init(
-    python: Python,
-    keywords: Vec<(String, Option<String>)>,
-) -> Result<i32, PyErr> {
+#[auto_func_name]
+#[pyfunction]
+fn text_search_ex_init(keywords: Vec<(String, Option<String>)>) -> Result<i32, PyErr> {
     let mut tsm = TSM
         .lock()
-        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
 
     let tsid = tsm.new_text_searcher(keywords);
 
@@ -882,20 +905,20 @@ fn text_search_ex_init(
 }
 
 /// text_search_ex_match 接口
-#[auto_func_name2]
+#[auto_func_name]
+#[pyfunction]
 fn text_search_ex_match(
-    python: Python,
     tsid: i32,
     text: &str,
     option: &str,
 ) -> Result<Vec<(String, usize, usize)>, PyErr> {
     let mut tsm = TSM
         .lock()
-        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
 
     let ts = tsm
         .get_text_searcher(tsid)
-        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
 
     let result = match option {
         "l" => ts.match_line(text),
@@ -907,15 +930,16 @@ fn text_search_ex_match(
 }
 
 /// text_search_ex_subst 接口
-#[auto_func_name2]
-fn text_search_ex_subst(python: Python, tsid: i32, text: &str) -> Result<String, PyErr> {
+#[auto_func_name]
+#[pyfunction]
+fn text_search_ex_subst(tsid: i32, text: &str) -> Result<String, PyErr> {
     let mut tsm = TSM
         .lock()
-        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
 
     let ts = tsm
         .get_text_searcher(tsid)
-        .or_else(|err| raise_error!(python, __func__, "", "\n", err))?;
+        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
 
     // #[cfg(target_os = "linux")]
     // let (guard, prof) = (pprof::ProfilerGuard::new(100).unwrap(), true);
@@ -940,6 +964,7 @@ fn text_search_ex_subst(python: Python, tsid: i32, text: &str) -> Result<String,
 }
 
 /// text_search_match 接口
+#[pyfunction]
 fn text_search_match(
     _python: Python,
     keywords: Vec<String>,
@@ -955,6 +980,7 @@ fn text_search_match(
 }
 
 /// text_search_subst 接口
+#[pyfunction]
 fn text_search_subst(
     _python: Python,
     keywords: Vec<(String, String)>,
@@ -967,60 +993,4 @@ fn text_search_subst(
     ts.create_blues();
 
     Ok(ts.subst(text))
-}
-
-/// python 扩展模块初始化
-pub fn module_initializer(python: Python, module: &PyModule) -> Result<(), PyErr> {
-    // 查找, 按 u8 切分, 仅用一次
-    module.add(
-        python,
-        "text_search_once",
-        py_fn!(python, text_search_match(keywords: Vec<String>, text: &str)),
-    )?;
-
-    // 替换, 按 char 切分, 仅用一次
-    module.add(
-        python,
-        "text_search_subst",
-        py_fn!(
-            python,
-            text_search_subst(keywords: Vec<(String, String)>, text: &str)
-        ),
-    )?;
-
-    // 查找/替换, 按 char 切分, 初始化
-    module.add(
-        python,
-        "text_search_ex_init",
-        py_fn!(
-            python,
-            text_search_ex_init(keywords: Vec<(String, Option<String>)>)
-        ),
-    )?;
-
-    // 查找/替换, 按 char 切分, 查询
-    module.add(
-        python,
-        "text_search_ex_match",
-        py_fn!(
-            python,
-            text_search_ex_match(tsid: i32, text: &str, option: &str)
-        ),
-    )?;
-
-    // 查找/替换, 按 char 切分, 替换
-    module.add(
-        python,
-        "text_search_ex_subst",
-        py_fn!(python, text_search_ex_subst(tsid: i32, text: &str)),
-    )?;
-
-    // 查找/替换, 按 char 切分, 释放
-    module.add(
-        python,
-        "text_search_ex_free",
-        py_fn!(python, text_search_ex_free(tsid: i32)),
-    )?;
-
-    Ok(())
 }
