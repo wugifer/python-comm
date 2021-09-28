@@ -162,7 +162,7 @@ mod keyword_node_test {
 /// Step4.  ts.match_() / ts.subst();  // ts 可复用
 ///
 /// ```
-/// use python_comm::basic_use::TextSearcher;
+/// use python_comm::use_basic::TextSearcher;
 ///
 /// let mut ts0 = TextSearcher::new();
 /// let mut ts1 = TextSearcher::new();
@@ -816,9 +816,13 @@ impl TextSearcherManager {
     /// 获取 ts
     #[auto_func_name]
     fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, anyhow::Error> {
-        self.tss
-            .remove(&tsid)
-            .ok_or_else(|| raise_error!(__func__, format!("指定的 TextSearcher={} 无效", tsid)))
+        self.tss.remove(&tsid).ok_or_else(|| {
+            raise_error!(
+                "raw",
+                __func__,
+                format!("指定的 TextSearcher={} 无效", tsid)
+            )
+        })
     }
 
     /// 构造

@@ -8,7 +8,7 @@ use std::time;
 ///
 /// ```
 /// use chrono::Datelike;
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// assert!(bj_date().year() >= 2021);
 /// ```
@@ -23,7 +23,7 @@ pub fn bj_date() -> NaiveDate {
 /// ## Usage
 ///
 /// ```
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// assert!(bj_dates().starts_with("20"));
 /// ````
@@ -39,7 +39,7 @@ pub fn bj_dates() -> String {
 ///
 /// ```
 /// use chrono::Timelike;
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// assert!(bj_time().time().hour() >= 0);
 /// ```
@@ -54,7 +54,7 @@ pub fn bj_time() -> NaiveDateTime {
 /// ## Usage
 ///
 /// ```
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// assert_eq!(bj_times().len(), 19);
 /// ```
@@ -69,7 +69,7 @@ pub fn bj_times() -> String {
 /// ## Usage
 ///
 /// ```
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// let ts = bj_timestamp();
 /// assert!(ts > 1623913021 && ts < 1623913021 + 86400 * 36500);
@@ -85,7 +85,7 @@ pub fn bj_timestamp() -> i64 {
 /// ## Usage
 ///
 /// ```
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// let ts = bj_timestamp_millis();
 /// assert!(ts > 1623913021000 && ts < 1623913021000 + 86400000 * 36500);
@@ -115,7 +115,7 @@ pub fn bj_timestamp_millis() -> i64 {
 /// ## Usage
 ///
 /// ```
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 ///
 /// let ts = bj_timestamp();
 /// let a = bjtc_nt(ts, 10).unwrap();
@@ -205,8 +205,11 @@ pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, anyhow::Error> {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, anyhow::Error> {
-    NaiveDateTime::from_timestamp_opt(timestamp, millis * 1000000)
-        .ok_or(raise_error!(__func__, format!("无效时间戳 {}", timestamp)))
+    NaiveDateTime::from_timestamp_opt(timestamp, millis * 1000000).ok_or(raise_error!(
+        "raw",
+        __func__,
+        format!("无效时间戳 {}", timestamp)
+    ))
 }
 
 // sx
@@ -268,7 +271,7 @@ pub fn bjtc_ts(time: &NaiveDateTime) -> String {
 ///
 /// ```
 /// use chrono::Utc;
-/// use python_comm::basic_use::*;
+/// use python_comm::use_basic::*;
 /// use std::{thread, time};
 ///
 /// let anchor = Utc::now();
@@ -313,10 +316,10 @@ pub fn bjtc_to_duration(
             elapsed.num_milliseconds() as u64
         ))
     } else {
-        Err(raise_error!(
+        raise_error!(
             __func__,
             format!("{} 结果为负值 {}", timestamp_millis, elapsed.num_seconds())
-        ))
+        )
     }
 }
 
