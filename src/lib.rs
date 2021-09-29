@@ -129,7 +129,10 @@ pub mod as_python_object_use {
 /// to use AsSqlTable
 pub mod as_sql_table_use {
     pub use crate::raise_error_use::*;
-    pub use mysql::prelude::{ConvIr, FromValue, Queryable};
+    pub use mysql::{
+        params,
+        prelude::{ConvIr, FromValue, Queryable},
+    };
     pub use python_comm_macros::AsSqlTable;
 }
 
@@ -184,7 +187,7 @@ pub mod use_basic {
 ///
 pub mod use_pyo3 {
     pub use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-    pub use pyo3::{proc_macro::pyfunction, types::PyModule, wrap_pyfunction, PyErr};
+    pub use pyo3::{proc_macro::pyfunction, types::PyModule, wrap_pyfunction, PyErr, Python};
     pub use rust_decimal::Decimal;
 }
 
