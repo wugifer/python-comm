@@ -1,7 +1,7 @@
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use pyo3::{
     proc_macro::pyclass,
-    types::{PyAny, PyDate, PyDateAccess, PyDateTime, PyTimeAccess},
+    types::{IntoPyDict, PyAny, PyDate, PyDateAccess, PyDateTime, PyTimeAccess},
     FromPyObject, IntoPy, PyErr, PyObject, Python, ToPyObject,
 };
 use python_comm_macros::auto_func_name;
@@ -23,6 +23,16 @@ macro_rules! new_type {
 pub struct PyClassObject {}
 
 new_type!(PyDecimal, Decimal);
+
+impl PyDecimal {
+    fn to_object_with_error<'p>(&self, python: Python<'p>) -> Result<&'p PyAny, PyErr> {
+        let decimal = python.import("decimal")?;
+
+        let locals = [("decimal", decimal)].into_py_dict(python);
+        let code = format!("decimal.Decimal(\"{}\")", self.0.to_string());
+        python.eval(&code, None, Some(&locals))
+    }
+}
 
 impl FromPyObject<'_> for PyDecimal {
     #[auto_func_name]
@@ -56,8 +66,11 @@ impl IntoPy<PyObject> for PyDecimal {
 }
 
 impl ToPyObject for PyDecimal {
-    fn to_object(&self, python: pyo3::Python) -> PyObject {
-        self.0.to_string().to_object(python)
+    fn to_object(&self, python: Python) -> PyObject {
+        match self.to_object_with_error(python) {
+            Ok(obj) => obj.to_object(python),
+            Err(_) => self.0.to_string().to_object(python),
+        }
     }
 }
 
