@@ -334,9 +334,10 @@ mod test {
         let now = time::Instant::now();
 
         thread::sleep(time::Duration::from_millis(700)); // 0.7 秒
-        let t1 = bjtc_from_duration(&anchor, now.elapsed().as_secs_f64() * 1000.0);
+        let elapsed = now.elapsed().as_secs_f64();
+        let t1 = bjtc_from_duration(&anchor, elapsed * 1000.0);
         let t2 = bjtc_to_duration(&anchor, t1).unwrap();
-        let diff = t2.as_secs_f64() - 0.7;
+        let diff = t2.as_secs_f64() - elapsed;
         assert!(diff > -0.01 && diff < 0.01);
 
         let t1 = bjtc_from_duration(&anchor, 1000.0);

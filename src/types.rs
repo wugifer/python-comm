@@ -1,7 +1,7 @@
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use pyo3::{
     proc_macro::pyclass,
-    types::{PyAny, PyDate, PyDateAccess, PyDateTime, PyTimeAccess, PyTuple},
+    types::{PyAny, PyDate, PyDateAccess, PyDateTime, PyTimeAccess},
     FromPyObject, IntoPy, PyErr, PyObject, Python, ToPyObject,
 };
 use python_comm_macros::auto_func_name;
@@ -57,7 +57,7 @@ impl IntoPy<PyObject> for PyDecimal {
 
 impl ToPyObject for PyDecimal {
     fn to_object(&self, python: pyo3::Python) -> PyObject {
-        PyTuple::new(python, vec![self.0.mantissa(), self.0.scale() as i128]).to_object(python)
+        self.0.to_string().to_object(python)
     }
 }
 
