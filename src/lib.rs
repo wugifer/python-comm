@@ -187,7 +187,11 @@ pub mod use_basic {
 ///
 pub mod use_pyo3 {
     pub use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-    pub use pyo3::{proc_macro::pyfunction, types::PyModule, wrap_pyfunction, PyErr, Python};
+    pub use pyo3::{
+        proc_macro::{pyfunction, pymodule},
+        types::PyModule,
+        wrap_pyfunction, PyErr, Python,
+    };
     pub use rust_decimal::Decimal;
 }
 
