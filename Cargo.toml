@@ -1,6 +1,6 @@
 [package]
 name = "python_comm"
-version = "0.2.5"
+version = "0.2.6"
 authors = ["wugifer <wugifer@>"]
 edition = "2018"
 description = "to make writing python modules with rust easier."
@@ -13,7 +13,7 @@ anyhow             = "~1.0"
 ahash              = "~0.7"
 chrono             = "~0.4"
 lazy_static        = "~1.4"
-pyo3               = "~0.14"
+pyo3               = { version = "~0.14", optional = true }
 mysql              = "~20.1"
 rust_decimal       = "~1.12"
 serde              = { version = "~1.0", features = ["derive"] }
@@ -26,9 +26,11 @@ python_comm_macros = "~0.2"
 [target.'cfg(target_os = "linux")'.dependencies]
 pprof              = { version = "~0.5", features = ["flamegraph"] }
 
-
 [dev-dependencies]
 rust_decimal_macros = "~1.12"
+
+[features]
+use_pyo3 = [ "pyo3" ]
 
 [lib]
 crate-type = ["lib", "cdylib"]

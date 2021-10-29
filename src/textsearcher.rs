@@ -1,7 +1,8 @@
+#[cfg(feature = "use_pyo3")]
+use crate::use_pyo3::*;
+
 use ahash::AHashMap;
 use lazy_static::lazy_static;
-use pyo3::{proc_macro::pyfunction, types::PyModule, wrap_pyfunction, PyErr, Python};
-
 use python_comm_macros::auto_func_name;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, mem::take, sync::Mutex};
@@ -799,7 +800,7 @@ impl TextSearcherForSerde {
     }
 }
 
-struct TextSearcherManager {
+pub struct TextSearcherManager {
     /// ts 总数
     count: i32,
 
@@ -809,13 +810,13 @@ struct TextSearcherManager {
 
 impl TextSearcherManager {
     /// 添加 ts
-    fn add_text_searcher(&mut self, tsid: i32, ts: TextSearcher) {
+    pub fn add_text_searcher(&mut self, tsid: i32, ts: TextSearcher) {
         self.tss.insert(tsid, ts);
     }
 
     /// 获取 ts
     #[auto_func_name]
-    fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, anyhow::Error> {
+    pub fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, anyhow::Error> {
         self.tss.remove(&tsid).ok_or_else(|| {
             raise_error!(
                 "raw",
@@ -834,7 +835,7 @@ impl TextSearcherManager {
     }
 
     /// 创建 ts
-    fn new_text_searcher(&mut self, keywords: Vec<(String, Option<String>)>) -> i32 {
+    pub fn new_text_searcher(&mut self, keywords: Vec<(String, Option<String>)>) -> i32 {
         self.count += 1;
 
         let mut ts = TextSearcher::new();
@@ -849,7 +850,7 @@ impl TextSearcherManager {
     }
 
     /// 删除 ts
-    fn remove_text_searcher(&mut self, tsid: i32) {
+    pub fn remove_text_searcher(&mut self, tsid: i32) {
         self.tss.remove(&tsid);
     }
 }
@@ -860,32 +861,34 @@ lazy_static! {
 }
 
 /// python 扩展模块初始化
+#[cfg(feature = "use_pyo3")]
 pub fn initialize(module: &PyModule) -> Result<(), PyErr> {
     // 查找, 按 u8 切分, 仅用一次
-    module.add_function(wrap_pyfunction!(text_search_match, module)?)?;
+    module.add_function(wrap_pyfunction!(py_text_search_match, module)?)?;
 
     // 替换, 按 char 切分, 仅用一次
-    module.add_function(wrap_pyfunction!(text_search_subst, module)?)?;
+    module.add_function(wrap_pyfunction!(py_text_search_subst, module)?)?;
 
     // 查找/替换, 按 char 切分, 初始化
-    module.add_function(wrap_pyfunction!(text_search_ex_init, module)?)?;
+    module.add_function(wrap_pyfunction!(py_text_search_ex_init, module)?)?;
 
     // 查找/替换, 按 char 切分, 查询
-    module.add_function(wrap_pyfunction!(text_search_ex_match, module)?)?;
+    module.add_function(wrap_pyfunction!(py_text_search_ex_match, module)?)?;
 
     // 查找/替换, 按 char 切分, 替换
-    module.add_function(wrap_pyfunction!(text_search_ex_subst, module)?)?;
+    module.add_function(wrap_pyfunction!(py_text_search_ex_subst, module)?)?;
 
     // 查找/替换, 按 char 切分, 释放
-    module.add_function(wrap_pyfunction!(text_search_ex_free, module)?)?;
+    module.add_function(wrap_pyfunction!(py_text_search_ex_free, module)?)?;
 
     Ok(())
 }
 
-/// text_search_ex_free 接口
+/// py_text_search_ex_free 接口
+#[cfg(feature = "use_pyo3")]
 #[auto_func_name]
 #[pyfunction]
-fn text_search_ex_free(tsid: i32) -> Result<i32, PyErr> {
+fn py_text_search_ex_free(tsid: i32) -> Result<i32, PyErr> {
     let mut tsm = TSM
         .lock()
         .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
@@ -895,10 +898,11 @@ fn text_search_ex_free(tsid: i32) -> Result<i32, PyErr> {
     Ok(0)
 }
 
-/// text_search_ex_init 接口
+/// py_text_search_ex_init 接口
+#[cfg(feature = "use_pyo3")]
 #[auto_func_name]
 #[pyfunction]
-fn text_search_ex_init(keywords: Vec<(String, Option<String>)>) -> Result<i32, PyErr> {
+fn py_text_search_ex_init(keywords: Vec<(String, Option<String>)>) -> Result<i32, PyErr> {
     let mut tsm = TSM
         .lock()
         .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
@@ -908,10 +912,11 @@ fn text_search_ex_init(keywords: Vec<(String, Option<String>)>) -> Result<i32, P
     Ok(tsid)
 }
 
-/// text_search_ex_match 接口
+/// py_text_search_ex_match 接口
+#[cfg(feature = "use_pyo3")]
 #[auto_func_name]
 #[pyfunction]
-fn text_search_ex_match(
+fn py_text_search_ex_match(
     tsid: i32,
     text: &str,
     option: &str,
@@ -933,10 +938,11 @@ fn text_search_ex_match(
     Ok(result)
 }
 
-/// text_search_ex_subst 接口
+/// py_text_search_ex_subst 接口
+#[cfg(feature = "use_pyo3")]
 #[auto_func_name]
 #[pyfunction]
-fn text_search_ex_subst(tsid: i32, text: &str) -> Result<String, PyErr> {
+fn py_text_search_ex_subst(tsid: i32, text: &str) -> Result<String, PyErr> {
     let mut tsm = TSM
         .lock()
         .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
@@ -967,9 +973,10 @@ fn text_search_ex_subst(tsid: i32, text: &str) -> Result<String, PyErr> {
     Ok(result)
 }
 
-/// text_search_match 接口
+/// py_text_search_match 接口
+#[cfg(feature = "use_pyo3")]
 #[pyfunction]
-fn text_search_match(
+fn py_text_search_match(
     _python: Python,
     keywords: Vec<String>,
     text: &str,
@@ -983,9 +990,10 @@ fn text_search_match(
     Ok(ts.match_(text))
 }
 
-/// text_search_subst 接口
+/// py_text_search_subst 接口
+#[cfg(feature = "use_pyo3")]
 #[pyfunction]
-fn text_search_subst(
+fn py_text_search_subst(
     _python: Python,
     keywords: Vec<(String, String)>,
     text: &str,

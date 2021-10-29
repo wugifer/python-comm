@@ -1,3 +1,4 @@
+#[cfg(feature = "use_pyo3")]
 use pyo3::{proc_macro::pymodule, types::PyModule, PyResult, Python};
 
 #[macro_use]
@@ -5,8 +6,9 @@ mod macros;
 
 mod datetime;
 
-mod textsearcher;
+pub mod textsearcher;
 
+#[cfg(feature = "use_pyo3")]
 pub mod types;
 
 /// to use AsDefaultStruct
@@ -185,6 +187,7 @@ pub mod use_basic {
 /// }
 /// ```
 ///
+#[cfg(feature = "use_pyo3")]
 pub mod use_pyo3 {
     pub use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     pub use pyo3::{
@@ -195,6 +198,7 @@ pub mod use_pyo3 {
     pub use rust_decimal::Decimal;
 }
 
+#[cfg(feature = "use_pyo3")]
 fn initialize(module: &PyModule) -> PyResult<()> {
     textsearcher::initialize(module)?;
 
@@ -203,6 +207,7 @@ fn initialize(module: &PyModule) -> PyResult<()> {
 
 /// 函数名必须和目标 xxx.pyd / xxx.so 相同, 和 cargo.toml 中 [lib].name 字段不要求（?）同名
 /// 注意, 当前的注释作为 xxx.__doc__ 出现
+#[cfg(feature = "use_pyo3")]
 #[cfg(debug_assertions)]
 #[pymodule]
 fn python_commd(_python: Python, module: &PyModule) -> PyResult<()> {
@@ -211,6 +216,7 @@ fn python_commd(_python: Python, module: &PyModule) -> PyResult<()> {
 
 /// 函数名必须和目标 xxx.pyd / xxx.so 相同, 和 cargo.toml 中 [lib].name 字段不要求（?）同名
 /// 注意, 当前的注释作为 xxx.__doc__ 出现
+#[cfg(feature = "use_pyo3")]
 #[cfg(not(debug_assertions))]
 #[pymodule]
 fn python_comm(_python: Python, module: &PyModule) -> PyResult<()> {
