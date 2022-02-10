@@ -16,6 +16,26 @@ macro_rules! crate_version {
     };
 }
 
+/// 用最短的代码引入文件名、行号
+/// 1. 仅函数名
+/// 2. 函数名 + 补充信息
+/// 3. 函数名 + 补充信息, 直接构造
+#[macro_export]
+macro_rules! m {
+    ($func:ident) => {
+        (file!(), line!(), $func, "")
+    };
+    ($func:ident, $text:expr) => {
+        (file!(), line!(), $func, $text)
+    };
+    ($func:ident, $text:expr, "more") => {
+        MoreError::new(file!(), line!(), $func, $text)
+    };
+    ($func:ident, $text:expr, "result") => {
+        Err(MoreError::new(file!(), line!(), $func, $text))
+    };
+}
+
 /// Generate pyo3::PyErr or anyhow::Error with file name, line number and function name
 ///
 /// ## Usage

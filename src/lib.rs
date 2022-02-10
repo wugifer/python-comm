@@ -6,6 +6,8 @@ mod macros;
 
 mod datetime;
 
+mod more_error;
+
 pub mod textsearcher;
 
 #[cfg(feature = "use_pyo3")]
@@ -147,7 +149,11 @@ pub mod as_sql_table_use {
 /// ```
 ///
 pub mod raise_error_use {
-    pub use crate::raise_error;
+    pub use crate::{
+        m,
+        more_error::{AddMore, MoreError},
+        raise_error,
+    };
     pub use python_comm_macros::auto_func_name;
 }
 
@@ -163,10 +169,9 @@ pub mod use_basic {
     pub use crate::{
         crate_version,
         datetime::{
-            bj_date, bj_dates, bj_time, bj_times, bj_timestamp, bj_timestamp_millis, bjtc_df,
-            bjtc_dn, bjtc_ds, bjtc_dt, bjtc_fd, bjtc_from_duration, bjtc_fs, bjtc_ft, bjtc_nd,
-            bjtc_ns, bjtc_nt, bjtc_sd, bjtc_st, bjtc_td, bjtc_tf, bjtc_tn, bjtc_to_duration,
-            bjtc_ts,
+            bj_date, bj_dates, bj_time, bj_times, bj_timestamp, bj_timestamp_millis, bjtc_df, bjtc_dn, bjtc_ds,
+            bjtc_dt, bjtc_fd, bjtc_from_duration, bjtc_fs, bjtc_ft, bjtc_nd, bjtc_ns, bjtc_nt, bjtc_sd, bjtc_st,
+            bjtc_td, bjtc_tf, bjtc_tn, bjtc_to_duration, bjtc_ts,
         },
         textsearcher::TextSearcher,
     };

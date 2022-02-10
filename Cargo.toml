@@ -1,8 +1,8 @@
 [package]
 name = "python_comm"
-version = "0.2.7"
+version = "0.2.8"
 authors = ["wugifer <wugifer@>"]
-edition = "2018"
+edition = "2021"
 description = "to make writing python modules with rust easier."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/wugifer/python-comm"
