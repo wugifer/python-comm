@@ -1,6 +1,6 @@
 [package]
 name = "python_comm"
-version = "0.2.8"
+version = "0.2.9"
 authors = ["wugifer <wugifer@>"]
 edition = "2021"
 description = "to make writing python modules with rust easier."
@@ -31,6 +31,7 @@ rust_decimal_macros = "~1.12"
 
 [features]
 use_pyo3 = [ "pyo3" ]
+use_m    = [ ]
 
 [lib]
 crate-type = ["lib", "cdylib"]

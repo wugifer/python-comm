@@ -6,6 +6,7 @@ mod macros;
 
 mod datetime;
 
+#[cfg(feature = "use_m")]
 mod more_error;
 
 pub mod textsearcher;
@@ -149,11 +150,7 @@ pub mod as_sql_table_use {
 /// ```
 ///
 pub mod raise_error_use {
-    pub use crate::{
-        m,
-        more_error::{AddMore, MoreError},
-        raise_error,
-    };
+    pub use crate::raise_error;
     pub use python_comm_macros::auto_func_name;
 }
 
@@ -177,6 +174,35 @@ pub mod use_basic {
     };
     pub use python_comm_macros::build_time;
     pub use rust_decimal::{prelude::FromPrimitive, Decimal};
+}
+
+/// ## Usage
+///
+/// ```
+/// use python_comm::{raise_error_use::*, use_m::*};
+/// use std::fs::File;
+///
+/// #[auto_func_name]
+/// #[auto_func_name]
+/// fn has_error(n: i32) -> Result<(), MoreError> {
+///     File::open("not exist").m(m!(__func__))?;
+///
+///    Ok(())
+/// }
+///
+/// fn main() {
+///    if let Err(err) = has_error(0) {
+///        println!("{}", err);
+///    }
+/// }
+/// ```
+///
+#[cfg(feature = "use_m")]
+pub mod use_m {
+    pub use crate::{
+        m,
+        more_error::{AddMore, MoreError},
+    };
 }
 
 /// to use pyo3::pyfunction
