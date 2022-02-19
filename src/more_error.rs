@@ -31,6 +31,12 @@ impl MoreError {
     }
 }
 
+impl fmt::Debug for MoreError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.err.fmt(f)
+    }
+}
+
 impl fmt::Display for MoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.err.fmt(f)
