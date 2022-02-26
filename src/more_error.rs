@@ -47,6 +47,9 @@ impl fmt::Display for MoreError {
 pub trait AddMore<T> {
     /// 附加文件名、行号、函数名、附加说明
     fn m(self, file_line_func_text: (&str, u32, &str, &str)) -> Result<T, MoreError>;
+
+    /// 附加文件名、行号、函数名、附加说明
+    fn p(self, file_line_func_text: (&str, u32, &str, &str));
 }
 
 impl<T, E> AddMore<T> for Result<T, E>
@@ -65,6 +68,22 @@ where
             ))
         })
     }
+
+    /// 附加文件名、行号、函数名、附加说明
+    fn p(self, file_line_func_text: (&str, u32, &str, &str)) {
+        if let Err(err) = self {
+            println!(
+                "{}",
+                MoreError::from_error(
+                    err,
+                    file_line_func_text.0,
+                    file_line_func_text.1,
+                    file_line_func_text.2,
+                    file_line_func_text.3,
+                )
+            );
+        }
+    }
 }
 
 impl<T> AddMore<T> for Result<T, MoreError> {
@@ -79,5 +98,21 @@ impl<T> AddMore<T> for Result<T, MoreError> {
                 file_line_func_text.3,
             ))
         })
+    }
+
+    /// 附加文件名、行号、函数名、附加说明
+    fn p(self, file_line_func_text: (&str, u32, &str, &str)) {
+        if let Err(err) = self {
+            println!(
+                "{}",
+                MoreError::from_more(
+                    err,
+                    file_line_func_text.0,
+                    file_line_func_text.1,
+                    file_line_func_text.2,
+                    file_line_func_text.3,
+                )
+            );
+        }
     }
 }
