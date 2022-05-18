@@ -1,4 +1,4 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, io};
 
 /// 包含更多信息的 Error
 pub struct MoreError {
@@ -83,6 +83,33 @@ where
                 )
             );
         }
+    }
+}
+
+impl<T> AddMore<T> for io::Error {
+    /// 附加文件名、行号、函数名、附加说明
+    fn m(self, file_line_func_text: (&str, u32, &str, &str)) -> Result<T, MoreError> {
+        Err(MoreError::from_error(
+            self,
+            file_line_func_text.0,
+            file_line_func_text.1,
+            file_line_func_text.2,
+            file_line_func_text.3,
+        ))
+    }
+
+    /// 附加文件名、行号、函数名、附加说明
+    fn p(self, file_line_func_text: (&str, u32, &str, &str)) {
+        println!(
+            "{}",
+            MoreError::from_error(
+                self,
+                file_line_func_text.0,
+                file_line_func_text.1,
+                file_line_func_text.2,
+                file_line_func_text.3,
+            )
+        );
     }
 }
 
