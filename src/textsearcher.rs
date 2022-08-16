@@ -1,6 +1,4 @@
-#[cfg(feature = "use_pyo3")]
-use crate::use_pyo3::*;
-
+use crate::use_m::*;
 use ahash::AHashMap;
 use lazy_static::lazy_static;
 use python_comm_macros::auto_func_name;
@@ -45,10 +43,7 @@ impl KeywordNode {
     /// debug 用
     #[cfg(test)]
     fn to_string(&self) -> String {
-        format!(
-            "{:?}/{}, {}, {}",
-            self.letters, self.length, self.name, self.is_blue
-        )
+        format!("{:?}/{}, {}, {}", self.letters, self.length, self.name, self.is_blue)
     }
 }
 
@@ -280,9 +275,9 @@ impl TextSearcher {
     }
 
     #[auto_func_name]
-    pub fn load(text: String) -> Result<Self, anyhow::Error> {
+    pub fn load(text: String) -> Result<Self, MoreError> {
         Ok(serde_json::from_str::<TextSearcherForSerde>(&text)
-            .or_else(|err| raise_error!(__func__, "\n", err))?
+            .m(m!(__func__))?
             .to())
     }
 
@@ -408,9 +403,8 @@ impl TextSearcher {
     }
 
     #[auto_func_name]
-    pub fn save(&self) -> Result<String, anyhow::Error> {
-        serde_json::to_string(&TextSearcherForSerde::from(self))
-            .or_else(|err| raise_error!(__func__, "\n", err))
+    pub fn save(&self) -> Result<String, MoreError> {
+        serde_json::to_string(&TextSearcherForSerde::from(self)).m(m!(__func__))
     }
 
     /// 替换
@@ -535,16 +529,9 @@ mod text_searcher_test {
         }
         ts.create_blues();
 
-        let mut blues = ts
-            .blues
-            .iter()
-            .map(|(k, v)| (*k, *v))
-            .collect::<Vec<(usize, usize)>>();
+        let mut blues = ts.blues.iter().map(|(k, v)| (*k, *v)).collect::<Vec<(usize, usize)>>();
         blues.sort();
-        assert_eq!(
-            blues,
-            [(3, 4), (5, 2), (6, 3), (7, 9), (8, 10), (10, 2), (11, 2)]
-        );
+        assert_eq!(blues, [(3, 4), (5, 2), (6, 3), (7, 9), (8, 10), (10, 2), (11, 2)]);
     }
 
     #[test]
@@ -559,21 +546,12 @@ mod text_searcher_test {
         let mut i = 0;
         for keyword in &["a", "ab", "bab", "bc", "bca", "c", "caa"] {
             println!("{}", keyword);
-            assert_eq!(
-                ts.get_node_by_keyword(&keyword.chars().collect::<Vec<char>>()),
-                ids[i]
-            );
+            assert_eq!(ts.get_node_by_keyword(&keyword.chars().collect::<Vec<char>>()), ids[i]);
             i += 1;
         }
 
-        assert_eq!(
-            ts.get_node_by_keyword(&"ac".chars().collect::<Vec<char>>()),
-            0
-        );
-        assert_eq!(
-            ts.get_node_by_keyword(&"xy".chars().collect::<Vec<char>>()),
-            0
-        );
+        assert_eq!(ts.get_node_by_keyword(&"ac".chars().collect::<Vec<char>>()), 0);
+        assert_eq!(ts.get_node_by_keyword(&"xy".chars().collect::<Vec<char>>()), 0);
     }
 
     #[test]
@@ -732,9 +710,7 @@ mod text_searcher_test {
             .len() // HashMap::keys(), values(), iter() 不保证顺序
         );
 
-        let ts = serde_json::from_str::<TextSearcherForSerde>(&text)
-            .unwrap()
-            .to();
+        let ts = serde_json::from_str::<TextSearcherForSerde>(&text).unwrap().to();
         assert_eq!(ts.nodes.len(), 6);
         assert_eq!(ts.blacks.len(), 5);
         assert_eq!(ts.blues.len(), 3);
@@ -816,14 +792,10 @@ impl TextSearcherManager {
 
     /// 获取 ts
     #[auto_func_name]
-    pub fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, anyhow::Error> {
-        self.tss.remove(&tsid).ok_or_else(|| {
-            raise_error!(
-                "raw",
-                __func__,
-                format!("指定的 TextSearcher={} 无效", tsid)
-            )
-        })
+    pub fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, MoreError> {
+        self.tss
+            .remove(&tsid)
+            .ok_or_else(|| m!(__func__, &format!("指定的 TextSearcher={} 无效", tsid), "more"))
     }
 
     /// 构造
@@ -858,151 +830,4 @@ impl TextSearcherManager {
 // 定义全局变量 GLOBALS
 lazy_static! {
     static ref TSM: Mutex<TextSearcherManager> = Mutex::new(TextSearcherManager::new());
-}
-
-/// python 扩展模块初始化
-#[cfg(feature = "use_pyo3")]
-pub fn initialize(module: &PyModule) -> Result<(), PyErr> {
-    // 查找, 按 u8 切分, 仅用一次
-    module.add_function(wrap_pyfunction!(py_text_search_match, module)?)?;
-
-    // 替换, 按 char 切分, 仅用一次
-    module.add_function(wrap_pyfunction!(py_text_search_subst, module)?)?;
-
-    // 查找/替换, 按 char 切分, 初始化
-    module.add_function(wrap_pyfunction!(py_text_search_ex_init, module)?)?;
-
-    // 查找/替换, 按 char 切分, 查询
-    module.add_function(wrap_pyfunction!(py_text_search_ex_match, module)?)?;
-
-    // 查找/替换, 按 char 切分, 替换
-    module.add_function(wrap_pyfunction!(py_text_search_ex_subst, module)?)?;
-
-    // 查找/替换, 按 char 切分, 释放
-    module.add_function(wrap_pyfunction!(py_text_search_ex_free, module)?)?;
-
-    Ok(())
-}
-
-/// py_text_search_ex_free 接口
-#[cfg(feature = "use_pyo3")]
-#[auto_func_name]
-#[pyfunction]
-fn py_text_search_ex_free(tsid: i32) -> Result<i32, PyErr> {
-    let mut tsm = TSM
-        .lock()
-        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
-
-    tsm.remove_text_searcher(tsid);
-
-    Ok(0)
-}
-
-/// py_text_search_ex_init 接口
-#[cfg(feature = "use_pyo3")]
-#[auto_func_name]
-#[pyfunction]
-fn py_text_search_ex_init(keywords: Vec<(String, Option<String>)>) -> Result<i32, PyErr> {
-    let mut tsm = TSM
-        .lock()
-        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
-
-    let tsid = tsm.new_text_searcher(keywords);
-
-    Ok(tsid)
-}
-
-/// py_text_search_ex_match 接口
-#[cfg(feature = "use_pyo3")]
-#[auto_func_name]
-#[pyfunction]
-fn py_text_search_ex_match(
-    tsid: i32,
-    text: &str,
-    option: &str,
-) -> Result<Vec<(String, usize, usize)>, PyErr> {
-    let mut tsm = TSM
-        .lock()
-        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
-
-    let ts = tsm
-        .get_text_searcher(tsid)
-        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
-
-    let result = match option {
-        "l" => ts.match_line(text),
-        _ => ts.match_(text),
-    };
-    tsm.add_text_searcher(tsid, ts);
-
-    Ok(result)
-}
-
-/// py_text_search_ex_subst 接口
-#[cfg(feature = "use_pyo3")]
-#[auto_func_name]
-#[pyfunction]
-fn py_text_search_ex_subst(tsid: i32, text: &str) -> Result<String, PyErr> {
-    let mut tsm = TSM
-        .lock()
-        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
-
-    let ts = tsm
-        .get_text_searcher(tsid)
-        .or_else(|err| raise_error!("py", __func__, "", "\n", err))?;
-
-    // #[cfg(target_os = "linux")]
-    // let (guard, prof) = (pprof::ProfilerGuard::new(100).unwrap(), true);
-
-    let result = ts.subst(text);
-    tsm.add_text_searcher(tsid, ts);
-
-    // #[cfg(target_os = "linux")]
-    {
-        // use std::fs::File;
-        // if prof {
-        //     if let Ok(report) = guard.report().build() {
-        //         let file = File::create("flamegraph.svg").unwrap();
-        //         let mut options = pprof::flamegraph::Options::default();
-        //         options.image_width = Some(1280);
-        //         report.flamegraph_with_options(file, &mut options).unwrap();
-        //     }
-        // }
-    }
-
-    Ok(result)
-}
-
-/// py_text_search_match 接口
-#[cfg(feature = "use_pyo3")]
-#[pyfunction]
-fn py_text_search_match(
-    _python: Python,
-    keywords: Vec<String>,
-    text: &str,
-) -> Result<Vec<(String, usize, usize)>, PyErr> {
-    let mut ts = TextSearcher::new();
-    for keyword in keywords {
-        ts.add_keyword(keyword.to_string(), None);
-    }
-    ts.create_blues();
-
-    Ok(ts.match_(text))
-}
-
-/// py_text_search_subst 接口
-#[cfg(feature = "use_pyo3")]
-#[pyfunction]
-fn py_text_search_subst(
-    _python: Python,
-    keywords: Vec<(String, String)>,
-    text: &str,
-) -> Result<String, PyErr> {
-    let mut ts = TextSearcher::new();
-    for (keyword, name) in keywords {
-        ts.add_keyword(keyword, Some(name));
-    }
-    ts.create_blues();
-
-    Ok(ts.subst(text))
 }
