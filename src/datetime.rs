@@ -219,7 +219,7 @@ pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<NaiveDateTime, MoreError> 
 #[inline]
 #[auto_func_name]
 pub fn bjtc_sd(text: &str) -> Result<NaiveDate, MoreError> {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").m(m!(__func__, text))
+    NaiveDate::parse_from_str(&text[..10], "%Y-%m-%d").m(m!(__func__, text))
 }
 
 /// See bjtc_df

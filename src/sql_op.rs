@@ -107,12 +107,31 @@ pub trait SqlModelPlus: SqlModel {
     // 从这里开始是需要 trait 实现的, 在 AsSqlModel 宏实现
     //
 
-    fn field_saves_without_id() -> &'static str;
-    fn field_updates_without_id() -> &'static str;
-    fn field_values_without_id(&self) -> Params;
-    fn fields_with_backquote() -> &'static str;
-    fn fields_with_backquote_without_id() -> &'static str;
+    /// 返回加锁的 DbPool, 注意类名写死了, 使用者需命名并引入 WhoCreateDbPool
     fn lock() -> Result<MutexGuard<'static, DbPool>, MoreError>;
+
+    // C-有逗号结尾, Q-有双引号, B-有反引号, I-去掉 id, P-作为参数, E-赋值, V-Value, EE-相等
+
+    /// `a`, `b`, `c`
+    fn make_fields_b() -> &'static str;
+    /// `a`, `b`, `c`
+    fn make_fields_bi() -> &'static str;
+    /// a=:a, b=:b
+    fn make_fields_e() -> &'static str;
+    /// a=:a, b=:b
+    fn make_fields_ei() -> &'static str;
+    /// :a, :b
+    fn make_fields_p() -> &'static str;
+    /// :a, :b
+    fn make_fields_pi() -> &'static str;
+    /// "a", "b", "c"
+    fn make_fields_q() -> &'static str;
+    /// "a", "b", "c",
+    fn make_fields_qc() -> &'static str;
+    /// vec![("a", self.a), ("b", self.b)]
+    fn make_fields_v(&self) -> Params;
+    /// vec![("a", self.a), ("b", self.b)]
+    fn make_fields_vi(&self) -> Params;
 
     //
     // 从这里开始是 trait 对外提供的
@@ -124,10 +143,10 @@ pub trait SqlModelPlus: SqlModel {
             &format!(
                 "INSERT INTO {} ({}) VALUES ({})",
                 Self::table_name(),
-                Self::fields_with_backquote_without_id(),
-                Self::field_saves_without_id(),
+                Self::make_fields_bi(),
+                Self::make_fields_pi(),
             ),
-            self.field_values_without_id(),
+            self.make_fields_vi(),
         )
     }
 
@@ -193,10 +212,10 @@ pub trait SqlModelPlus: SqlModel {
                 &format!(
                     "UPDATE {} SET {} WHERE id={}",
                     Self::table_name(),
-                    Self::field_updates_without_id(),
+                    Self::make_fields_ei(),
                     id
                 ),
-                self.field_values_without_id(),
+                self.make_fields_vi(),
             )
             .m(m!(__func__))
     }
