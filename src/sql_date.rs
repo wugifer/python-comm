@@ -30,6 +30,11 @@ impl SqlDate {
         Ok(Self { ndate, sdate: date })
     }
 
+    pub fn new_n(date: NaiveDate) -> Self {
+        let sdate = bjtc_ds(&date);
+        Self { ndate: date, sdate }
+    }
+
     #[inline]
     pub fn s(&self) -> &String {
         &self.sdate
@@ -134,6 +139,11 @@ impl SqlTime {
     pub fn new(time: String) -> Result<Self, MoreError> {
         let ntime = bjtc_st(&time).m(m!(__func__))?;
         Ok(Self { ntime, stime: time })
+    }
+
+    pub fn new_n(time: NaiveDateTime) -> Self {
+        let stime = bjtc_ts(&time);
+        Self { ntime: time, stime }
     }
 
     #[inline]
