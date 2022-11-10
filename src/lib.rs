@@ -72,7 +72,7 @@ pub mod use_m {
 pub mod use_sql {
     pub use {
         crate::{
-            sql_date::SqlDate,
+            sql_date::{SqlDate, SqlTime},
             sql_op::{CreateDbPool, DbPool, DbPoolArgs, SqlModel, SqlModelPlus},
         },
         mysql::{
