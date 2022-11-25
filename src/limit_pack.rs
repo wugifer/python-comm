@@ -58,8 +58,8 @@ impl LimitObj {
         string_trim
     }
 
-    /// 获取 trim 空间最小的 LIST/MAP/TUPLE 类型
-    fn get_min_list_trim(&self, mut list_trim: (usize, u32)) -> (usize, u32) {
+    /// 获取 trim 空间最小的 LIST/MAP/TUPLE 类型, list_trim = (trim, len, uid), trim/len 参与比较
+    fn get_min_list_trim(&self, mut list_trim: (usize, usize, u32)) -> (usize, usize, u32) {
         // 递归获取
         if let Some(v) = &self.v1 {
             for obj in v {
@@ -75,9 +75,26 @@ impl LimitObj {
             }
         }
 
-        // 更优
-        if (self.v1.is_some() || self.v2.is_some()) && self.trim > 0 && self.trim < list_trim.0 {
-            return (self.trim, self.uid);
+        // 无法裁剪
+        if self.trim == 0 {
+            return list_trim;
+        }
+
+        let mut trim = (self.trim, 1);
+        if let Some(v) = &self.v1 {
+            trim = (trim.0, v.len() + 1)
+        }
+        if let Some(v) = &self.v2 {
+            trim = (trim.0, v.len() + 1)
+        }
+
+        // 更优, 比较 trim/len
+        println!("trim: {:?}, list_trim: {:?}", trim, list_trim);
+        if (self.v1.is_some() || self.v2.is_some())
+            && self.trim > 0
+            && (list_trim.0 == usize::MAX || trim.0 * list_trim.1 < list_trim.0 * trim.1)
+        {
+            return (trim.0, trim.1, self.uid);
         }
 
         // 不动
@@ -127,8 +144,8 @@ impl LimitObj {
         while self.space > max_size {
             // 统计 string, list 类型, 假定字段总量很小, 不优化统计过程
             let mut uids = Vec::new();
-            self.get_max_string_trim(1, &mut uids);
-            let (list_trim, uid) = self.get_min_list_trim((usize::MAX, 0));
+            let string_trim = self.get_max_string_trim(1, &mut uids);
+            let (list_trim, list_len, uid) = self.get_min_list_trim((usize::MAX, 1, 0));
 
             if uids.len() == 0 {
                 if uid == 0 {
@@ -143,7 +160,8 @@ impl LimitObj {
                     // 只能 trim string
                     self.trim_match(&uids);
                 } else {
-                    if list_trim < uids.len() {
+                    // list_trim / list_len vs 1 / string_trim * count
+                    if list_trim * string_trim < 1 * list_len * uids.len() {
                         // 优先 trim list
                         self.trim_match(&vec![uid]);
                     } else {
