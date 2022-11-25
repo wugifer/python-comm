@@ -89,7 +89,6 @@ impl LimitObj {
         }
 
         // 更优, 比较 trim/len
-        println!("trim: {:?}, list_trim: {:?}", trim, list_trim);
         if (self.v1.is_some() || self.v2.is_some())
             && self.trim > 0
             && (list_trim.0 == usize::MAX || trim.0 * list_trim.1 < list_trim.0 * trim.1)
