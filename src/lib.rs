@@ -2,6 +2,7 @@
 mod macros;
 
 mod datetime;
+mod limit_pack;
 mod more_error;
 
 #[cfg(feature = "use_sql")]
@@ -64,6 +65,27 @@ pub mod use_m {
             more_error::{AddMore, MoreError},
         },
         python_comm_macros::auto_func_name,
+    };
+}
+
+/// ## Usage
+///
+/// ```
+/// use python_comm::use_limit_pack::*;
+///
+/// #[derive(LimitPack)]
+/// struct Abc {
+///     a: i32,
+///     b: &'static str,
+/// }
+///
+/// assert_eq!(Abc{a:1, b:"abcdefghijk"}.limit_pack(15), "(a:1,b:abcdef~)");
+/// ```
+///
+pub mod use_limit_pack {
+    pub use {
+        crate::limit_pack::{LimitObj, LimitPackAble},
+        python_comm_macros::LimitPack,
     };
 }
 
