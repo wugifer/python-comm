@@ -138,6 +138,7 @@ pub trait SqlModelPlus: SqlModel {
     //
 
     #[auto_func_name]
+    /// 增
     fn create(&self) -> Result<Option<u64>, MoreError> {
         Self::lock().m(m!(__func__))?.get_id(
             &format!(
@@ -151,6 +152,7 @@ pub trait SqlModelPlus: SqlModel {
     }
 
     #[auto_func_name]
+    /// 删
     fn delete(condition: &str, params: Params) -> Result<(), MoreError> {
         Self::lock().m(m!(__func__))?.get_nothing(
             &format!("DELETE FROM {} WHERE {}", Self::table_name(), condition),
@@ -216,6 +218,18 @@ pub trait SqlModelPlus: SqlModel {
                     id
                 ),
                 self.make_fields_vi(),
+            )
+            .m(m!(__func__))
+    }
+
+    #[auto_func_name]
+    /// 改
+    fn update(fields_ei: &str, condition: &str, params: Params) -> Result<(), MoreError> {
+        Self::lock()
+            .m(m!(__func__))?
+            .get_nothing(
+                &format!("UPDATE {} SET {} WHERE {}", Self::table_name(), fields_ei, condition),
+                params,
             )
             .m(m!(__func__))
     }
