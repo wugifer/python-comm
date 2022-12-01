@@ -146,7 +146,7 @@ pub fn bjtc_ds(date: &NaiveDate) -> String {
 /// See bjtc_df
 #[inline]
 pub fn bjtc_dt(date: &NaiveDate) -> NaiveDateTime {
-    date.and_hms(0, 0, 0)
+    date.and_hms_opt(0, 0, 0).unwrap() // (0,0,0) 不会返回 None
 }
 
 // fx

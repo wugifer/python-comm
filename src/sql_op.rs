@@ -151,10 +151,10 @@ pub trait SqlModelPlus: SqlModel {
     }
 
     #[auto_func_name]
-    fn delete(condition: &str) -> Result<(), MoreError> {
+    fn delete(condition: &str, params: Params) -> Result<(), MoreError> {
         Self::lock().m(m!(__func__))?.get_nothing(
             &format!("DELETE FROM {} WHERE {}", Self::table_name(), condition),
-            ().into(),
+            params,
         )
     }
 

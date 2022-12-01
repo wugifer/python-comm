@@ -67,7 +67,7 @@ impl Default for SqlDate {
     fn default() -> Self {
         Self {
             sdate: "2000-01-01".to_string(),
-            ndate: NaiveDate::from_ymd(2000, 1, 1),
+            ndate: NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), // (2000,1,1) 不会返回 None
         }
     }
 }
@@ -90,11 +90,13 @@ pub struct SqlDateParser {
 impl ConvIr<SqlDate> for SqlDateParser {
     fn new(value: Value) -> Result<Self, FromValueError> {
         let (sdate, ndate) = match value {
-            Value::Date(y, m, d, _, _, _, _) => {
-                let ndate = NaiveDate::from_ymd(y as i32, m as u32, d as u32);
-                let sdate = bjtc_ds(&ndate);
-                (sdate, ndate)
-            }
+            Value::Date(y, m, d, _, _, _, _) => match NaiveDate::from_ymd_opt(y as i32, m as u32, d as u32) {
+                Some(ndate) => {
+                    let sdate = bjtc_ds(&ndate);
+                    (sdate, ndate)
+                }
+                None => return Err(FromValueError(value)),
+            },
             _ => {
                 let sdate = String::from_value_opt(value.clone())?;
                 let ndate = match bjtc_sd(&sdate) {
@@ -178,7 +180,10 @@ impl Default for SqlTime {
     fn default() -> Self {
         Self {
             stime: "2000-01-01".to_string(),
-            ntime: NaiveDateTime::new(NaiveDate::from_ymd(2000, 1, 1), NaiveTime::from_hms(0, 0, 0)),
+            ntime: NaiveDateTime::new(
+                NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), // (2000,1,1) 不会返回 None
+                NaiveTime::from_hms_opt(0, 0, 0).unwrap(),    // (0,0,0) 不会返回 None
+            ),
         }
     }
 }
@@ -201,14 +206,17 @@ pub struct SqlTimeParser {
 impl ConvIr<SqlTime> for SqlTimeParser {
     fn new(value: Value) -> Result<Self, FromValueError> {
         let (stime, ntime) = match value {
-            Value::Date(y, mo, d, h, mi, s, _) => {
-                let ntime = NaiveDateTime::new(
-                    NaiveDate::from_ymd(y as i32, mo as u32, d as u32),
-                    NaiveTime::from_hms(h as u32, mi as u32, s as u32),
-                );
-                let stime = bjtc_ts(&ntime);
-                (stime, ntime)
-            }
+            Value::Date(y, mo, d, h, mi, s, _) => match NaiveDate::from_ymd_opt(y as i32, mo as u32, d as u32) {
+                Some(ndate) => match NaiveTime::from_hms_opt(h as u32, mi as u32, s as u32) {
+                    Some(ntime) => {
+                        let ntime = NaiveDateTime::new(ndate, ntime);
+                        let stime = bjtc_ts(&ntime);
+                        (stime, ntime)
+                    }
+                    None => return Err(FromValueError(value)),
+                },
+                None => return Err(FromValueError(value)),
+            },
             _ => {
                 let stime = String::from_value_opt(value.clone())?;
                 let ntime = match bjtc_st(&stime) {
