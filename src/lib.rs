@@ -30,6 +30,7 @@ pub mod use_basic {
                 bjtc_dt, bjtc_fd, bjtc_from_duration, bjtc_fs, bjtc_ft, bjtc_nd, bjtc_ns, bjtc_nt, bjtc_sd, bjtc_st,
                 bjtc_td, bjtc_tf, bjtc_tn, bjtc_to_duration, bjtc_ts,
             },
+            ok_or_return, some_or_return,
             textsearcher::TextSearcher,
         },
         python_comm_macros::build_time,

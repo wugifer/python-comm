@@ -35,3 +35,25 @@ macro_rules! m {
         Err(MoreError::new(file!(), line!(), $func, $text))
     };
 }
+
+/// 提取 Result 中的内容, 或从当前函数返回
+#[macro_export]
+macro_rules! ok_or_return {
+    ($e:expr, $r:expr) => {
+        match $e {
+            Ok(e) => e,
+            Err(_) => return $r,
+        }
+    };
+}
+
+/// 提取 Option 中的内容, 或从当前函数返回
+#[macro_export]
+macro_rules! some_or_return {
+    ($e:expr, $r:expr) => {
+        match $e {
+            Some(e) => e,
+            None => return $r,
+        }
+    };
+}
