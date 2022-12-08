@@ -92,23 +92,21 @@ pub struct DbPoolArgs {
     pub db_name: String,        // 数据库
 }
 
-/// 可作为 sql model, 不要求全部字段
 pub trait SqlModel {
-    //
-    // 从这里开始是需要 trait 实现的
-    //
-
-    /// 数据库表名
-    fn table_name() -> &'static str;
-}
-
-pub trait SqlModelPlus: SqlModel {
     //
     // 从这里开始是需要 trait 实现的, 在 AsSqlModel 宏实现
     //
 
+    /// 比较两个 obj
+    fn equal(&self, other: &Self) -> bool;
+
+    /// 比较两个 obj, 排除 id
+    fn equal_without_id(&self, other: &Self) -> bool;
+
     /// 返回加锁的 DbPool, 注意类名写死了, 使用者需命名并引入 WhoCreateDbPool
     fn lock() -> Result<MutexGuard<'static, DbPool>, MoreError>;
+
+    fn make_create_table() -> &'static str;
 
     // C-有逗号结尾, Q-有双引号, B-有反引号, I-去掉 id, P-作为参数, E-赋值, V-Value, EE-相等
 
@@ -132,6 +130,9 @@ pub trait SqlModelPlus: SqlModel {
     fn make_fields_v(&self) -> Params;
     /// vec![("a", self.a), ("b", self.b)]
     fn make_fields_vi(&self) -> Params;
+
+    /// 数据库表名
+    fn table_name() -> &'static str;
 
     //
     // 从这里开始是 trait 对外提供的

@@ -1,6 +1,6 @@
 [package]
 name = "python_comm"
-version = "0.3.13"
+version = "0.3.14"
 authors = ["wugifer <wugifer@>"]
 edition = "2021"
 description = "to make writing python modules with rust easier."
