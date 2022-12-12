@@ -762,9 +762,9 @@ dependencies = [
 
 [[package]]
 name = "python_comm_macros"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56bbd10d8e5402865c1b396e67f0f944ec30a5b556da9715a875af4efa3dac36"
+checksum = "747d61d39b59e72bdb5929aa5fbac9f80e29028fd70af42b5c50d2b3f23d009f"
 dependencies = [
  "chrono",
  "proc-macro2",
