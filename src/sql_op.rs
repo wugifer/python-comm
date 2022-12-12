@@ -224,6 +224,66 @@ pub trait SqlModel {
     }
 
     #[auto_func_name]
+    /// 获取可能的单个记录, 含带参条件
+    fn select_one(where_sql: &str, params: Params) -> Result<Option<Self>, MoreError>
+    where
+        Self: 'static + Sized + FromRow,
+    {
+        match Self::lock()
+            .m(m!(__func__))?
+            ._get()
+            .m(m!(__func__))?
+            .exec_first_opt(
+                &format!(
+                    "SELECT {} FROM {} {}",
+                    Self::make_fields_b(),
+                    Self::table_name(),
+                    where_sql
+                ),
+                &params,
+            )
+            .f(m!(__func__, || { format!("{}: {:?}", where_sql, &params) }))?
+        {
+            Some(Ok(row)) => Ok(Some(row)),
+            Some(Err(err)) => Err(err).m(m!(__func__)),
+            None => Ok(None),
+        }
+    }
+
+    #[auto_func_name]
+    /// 获取多个记录, 含带参条件
+    fn select_some(where_sql: &str, params: Params) -> Result<Vec<Self>, MoreError>
+    where
+        Self: 'static + Sized + FromRow,
+    {
+        // 全部结果
+        let rows = Self::lock()
+            .m(m!(__func__))?
+            ._get()
+            .m(m!(__func__))?
+            .exec_first_opt(
+                &format!(
+                    "SELECT {} FROM {} {}",
+                    Self::make_fields_b(),
+                    Self::table_name(),
+                    where_sql
+                ),
+                &params,
+            )
+            .f(m!(__func__, || { format!("{}: {:?}", where_sql, &params) }))?;
+
+        // 如果有 FromRowError, 抛出异常, 这样后续可以 unwrap (map 中不可抛出异常)
+        for (i, row) in rows.iter().enumerate() {
+            if let Err(err) = row {
+                return Err(err).f(m!(__func__, || { format!("{}: {:?}, row[{}]", where_sql, &params, i) }));
+            }
+        }
+
+        // 已确认 x 不含异常, 收集
+        Ok(rows.into_iter().map(|x| x.unwrap()).collect())
+    }
+
+    #[auto_func_name]
     /// 改
     fn update(fields_ei: &str, condition: &str, params: Params) -> Result<(), MoreError> {
         Self::lock()
