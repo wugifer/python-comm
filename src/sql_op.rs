@@ -261,7 +261,7 @@ pub trait SqlModel {
             .m(m!(__func__))?
             ._get()
             .m(m!(__func__))?
-            .exec_first_opt(
+            .exec_opt(
                 &format!(
                     "SELECT {} FROM {} {}",
                     Self::make_fields_b(),
