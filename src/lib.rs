@@ -90,6 +90,24 @@ pub mod use_limit_pack {
     };
 }
 
+/// ## Usage
+///
+/// ```
+/// use python_comm::use_quick_assign::*;
+///
+/// #[derive(Default, QuickAssign)]
+/// struct Abc {
+///     a: i32,
+///     b: &'static str,
+/// }
+///
+/// let _ = Abc::default().a(1).b("2");
+/// ```
+///
+pub mod use_quick_assign {
+    pub use python_comm_macros::QuickAssign;
+}
+
 #[cfg(feature = "use_sql")]
 /// to use AsSqlModel
 pub mod use_sql {
