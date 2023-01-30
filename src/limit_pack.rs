@@ -405,6 +405,18 @@ where
     }
 }
 
+impl<T> LimitPackAble for Option<T>
+where
+    T: LimitPackAble,
+{
+    fn to_limit_obj(&self) -> LimitObj {
+        match self {
+            Some(obj) => obj.to_limit_obj(),
+            None => LimitObj::new_string("None".to_string(), true),
+        }
+    }
+}
+
 macro_rules! peel {
     ($name:ident, $($other:ident,)*) => (tuple! { $($other,)* })
 }
