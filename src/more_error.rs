@@ -2,48 +2,58 @@ use std::{error::Error, fmt};
 
 /// 包含更多信息的 Error
 pub struct MoreError {
-    simple: String,
-    full: String,
+    simple_text: String,
+    detail_text: String,
 }
 
 impl MoreError {
+    /// 详细内容
+    pub fn detail(&self) -> &String {
+        &self.detail_text
+    }
+
     /// 从 Error 构造
     fn from_error<E>(err: &E, file: &str, line: u32, func: &str, text: &str) -> Self
     where
         E: Error,
     {
         Self {
-            simple: format!("Error: {} {}()\nError: {}", file, func, err),
-            full: format!("Error: {}:{:3} {}() {}\nError: {:?}", file, line, func, text, err),
+            simple_text: format!("Error: {} {}()\nError: {}", file, func, err),
+            detail_text: format!("Error: {}:{:3} {}() {}\nError: {:?}", file, line, func, text, err),
         }
     }
 
     /// 从 MoreError 构造
     fn from_more(err: &Self, file: &str, line: u32, func: &str, text: &str) -> Self {
         Self {
-            simple: format!("Error: {} {}()\n{}", file, func, err),
-            full: format!("Error: {}:{:3} {}() {}\n{:?}", file, line, func, text, err),
+            simple_text: format!("Error: {} {}()\n{}", file, func, err.simple()),
+            detail_text: format!("Error: {}:{:3} {}() {}\n{}", file, line, func, text, err.detail()),
         }
     }
 
     /// 从零构造
     pub fn new(file: &str, line: u32, func: &str, text: &str) -> Self {
         Self {
-            simple: format!("Error: {} {}()", file, func),
-            full: format!("Error: {}:{:3} {}() {}", file, line, func, text),
+            simple_text: format!("Error: {} {}()", file, func),
+            detail_text: format!("Error: {}:{:3} {}() {}", file, line, func, text),
         }
+    }
+
+    /// 简单内容
+    pub fn simple(&self) -> &String {
+        &self.simple_text
     }
 }
 
 impl fmt::Debug for MoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.full.fmt(f)
+        self.simple().fmt(f)
     }
 }
 
 impl fmt::Display for MoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.simple.fmt(f)
+        self.detail().fmt(f)
     }
 }
 
@@ -106,6 +116,7 @@ where
                     file_line_func_text.2,
                     file_line_func_text.3,
                 )
+                .detail()
             );
         }
     }
@@ -143,7 +154,7 @@ where
     /// 附加文件名、行号、函数名、附加说明
     fn p(&self, file_line_func_text: (&str, u32, &str, &str)) {
         println!(
-            "{:?}",
+            "{}",
             MoreError::from_error(
                 self,
                 file_line_func_text.0,
@@ -151,6 +162,7 @@ where
                 file_line_func_text.2,
                 file_line_func_text.3,
             )
+            .detail()
         );
     }
 }
@@ -189,7 +201,7 @@ impl<T> AddMore<T> for Result<T, MoreError> {
     fn p(&self, file_line_func_text: (&str, u32, &str, &str)) {
         if let Err(err) = self {
             println!(
-                "{:?}",
+                "{}",
                 MoreError::from_more(
                     err,
                     file_line_func_text.0,
@@ -197,6 +209,7 @@ impl<T> AddMore<T> for Result<T, MoreError> {
                     file_line_func_text.2,
                     file_line_func_text.3,
                 )
+                .detail()
             );
         }
     }
@@ -231,7 +244,7 @@ impl<T> AddMore<T> for &MoreError {
     /// 附加文件名、行号、函数名、附加说明
     fn p(&self, file_line_func_text: (&str, u32, &str, &str)) {
         println!(
-            "{:?}",
+            "{}",
             MoreError::from_more(
                 self,
                 file_line_func_text.0,
@@ -239,6 +252,7 @@ impl<T> AddMore<T> for &MoreError {
                 file_line_func_text.2,
                 file_line_func_text.3,
             )
+            .detail()
         );
     }
 }
