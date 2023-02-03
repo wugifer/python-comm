@@ -55,12 +55,11 @@ impl DbPool {
     where
         Self: 'static,
     {
-        Ok(self
-            ._get()
+        self._get()
             .m(m!(__func__))?
-            .exec_iter(sql, params)
-            .m(m!(__func__, sql))?
-            .last_insert_id())
+            .exec_iter(sql, &params)
+            .map(|x| x.last_insert_id())
+            .f(m!(__func__, || { format!("{} {:?}", sql, params) }))
     }
 
     #[auto_func_name]
@@ -72,9 +71,7 @@ impl DbPool {
         self._get()
             .m(m!(__func__))?
             .exec_drop(sql, &params)
-            .f(m!(__func__, || { format!("{}: {:?}", sql, &params) }))?;
-
-        Ok(())
+            .f(m!(__func__, || { format!("{}: {:?}", sql, &params) }))
     }
 
     pub fn new(args: &'static DbPoolArgs) -> Self {
@@ -141,24 +138,30 @@ pub trait SqlModel {
     #[auto_func_name]
     /// 增
     fn create(&self) -> Result<Option<u64>, MoreError> {
-        Self::lock().m(m!(__func__))?.get_id(
-            &format!(
-                "INSERT INTO {} ({}) VALUES ({})",
-                Self::table_name(),
-                Self::make_fields_bi(),
-                Self::make_fields_pi(),
-            ),
-            self.make_fields_vi(),
-        )
+        Self::lock()
+            .m(m!(__func__))?
+            .get_id(
+                &format!(
+                    "INSERT INTO {} ({}) VALUES ({})",
+                    Self::table_name(),
+                    Self::make_fields_bi(),
+                    Self::make_fields_pi(),
+                ),
+                self.make_fields_vi(),
+            )
+            .m(m!(__func__))
     }
 
     #[auto_func_name]
     /// 删
     fn delete(condition: &str, params: Params) -> Result<(), MoreError> {
-        Self::lock().m(m!(__func__))?.get_nothing(
-            &format!("DELETE FROM {} WHERE {}", Self::table_name(), condition),
-            params,
-        )
+        Self::lock()
+            .m(m!(__func__))?
+            .get_nothing(
+                &format!("DELETE FROM {} WHERE {}", Self::table_name(), condition),
+                params,
+            )
+            .m(m!(__func__))
     }
 
     #[auto_func_name]
