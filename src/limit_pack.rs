@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 pub struct LimitObj {
     uid: u32,                              // 裁剪过程中的唯一编号
-    text: Option<String>,                  // 裁剪后的字符串
+    chars: Vec<char>,                      // 裁剪后的字符串, 不用 String, 后者 utf-8 切片困难
     v1: Option<Vec<LimitObj>>,             // 裁剪后的列表
     v2: Option<Vec<(LimitObj, LimitObj)>>, // 裁剪后的字典
     c: (char, char),                       // 界定符, () 或 [] 或 {}
@@ -29,7 +29,7 @@ impl LimitObj {
     /// 获取 trim 空间最大的 STRING 类型
     fn get_max_string_trim(&self, mut string_trim: usize, uids: &mut Vec<u32>) -> usize {
         // string 类型
-        if self.text.is_some() {
+        if self.chars.len() > 0 {
             if self.trim > string_trim {
                 uids.clear();
             }
@@ -103,8 +103,8 @@ impl LimitObj {
     /// 获取最终文本
     fn get_text(&self) -> String {
         // string 类型
-        if let Some(text) = &self.text {
-            return text.clone();
+        if self.chars.len() > 0 {
+            return self.chars.iter().map(|ch| ch.to_string()).collect::<Vec<_>>().join("");
         }
 
         // list 类型
@@ -112,7 +112,7 @@ impl LimitObj {
             return format!(
                 "{}{}{}{}",
                 self.c.0,
-                v.iter().map(|x| x.get_text()).collect::<Vec<String>>().join(","),
+                v.iter().map(|x| x.get_text()).collect::<Vec<_>>().join(","),
                 if self.more == 1 { "^" } else { "" },
                 self.c.1
             );
@@ -125,15 +125,30 @@ impl LimitObj {
                 self.c.0,
                 v.iter()
                     .map(|x| format!("{}:{}", x.0.get_text(), x.1.get_text()))
-                    .collect::<Vec<String>>()
+                    .collect::<Vec<_>>()
                     .join(","),
                 if self.more == 1 { "^" } else { "" },
                 self.c.1
             );
         }
 
-        // 正常不应该走到这里
+        // string 类型, 空串无法进入第一个 if 流程
         "".to_string()
+    }
+
+    /// 获取 trim 空间: 替换为 ~ 后减少的空间
+    fn get_trim(chars: &Vec<char>, total: usize) -> usize {
+        let mut sum_size = 0;
+        for ch in chars {
+            if sum_size >= 3 {
+                // 从这里开始换成 ~
+                return total - (sum_size + 1);
+            }
+            sum_size += ch.len_utf8();
+        }
+
+        // 始终不能 >= 3, 不必 trim
+        return 0;
     }
 
     /// 限制最终文本长度
@@ -196,7 +211,7 @@ impl LimitObj {
     fn new_empty() -> Self {
         Self {
             uid: 0,
-            text: None,
+            chars: Vec::new(),
             v1: None,
             v2: None,
             c: (' ', ' '),
@@ -236,11 +251,14 @@ impl LimitObj {
         // 总空间
         let space = text.len();
 
+        // 拆解
+        let chars = text.chars().collect();
+
         // 可裁剪空间: abcxyz => abc~
-        let trim = if fix { 0 } else { text.len().max(4) - 4 };
+        let trim = if fix { 0 } else { Self::get_trim(&chars, space) };
 
         Self {
-            text: Some(text),
+            chars,
             space,
             trim,
             ..Self::new_empty()
@@ -273,11 +291,14 @@ impl LimitObj {
     /// 裁剪, 假定调用者保证可裁剪
     fn trim(&mut self) -> usize {
         // string 类型
-        if let Some(text) = &self.text {
-            self.text = Some(format!("{}~", &text[0..(text.len() - 2)]));
-            self.space -= 1;
-            self.trim -= 1;
-            return 1;
+        if self.chars.len() >= 2 {
+            let last = self.chars.pop().unwrap(); // len() >= 2 确保 last() 有效
+            let prev = self.chars.pop().unwrap(); // len() >= 2 确保 last() 有效
+            let trim = last.len_utf8() + prev.len_utf8() - 1;
+            self.chars.push('~');
+            self.space -= trim;
+            self.trim -= trim;
+            return trim;
         }
 
         // list 类型, [x,y,z] => [x,y^] or [x,y,z^] => [x,y^]
@@ -315,7 +336,7 @@ impl LimitObj {
     /// 对 uids 中的元素执行 trim
     fn trim_match(&mut self, uids: &Vec<u32>) -> usize {
         // string 类型
-        if self.text.is_some() && uids.contains(&self.uid) {
+        if self.chars.len() >= 2 && uids.contains(&self.uid) {
             return self.trim();
         }
 
