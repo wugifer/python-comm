@@ -247,12 +247,20 @@ impl LimitObj {
     }
 
     /// 构造, uid 后续统一设置
-    pub fn new_string(text: String, fix: bool) -> Self {
-        // 总空间
-        let space = text.len();
-
+    pub fn new_string(text: String, fix: bool, max: usize) -> Self {
         // 拆解
-        let chars = text.chars().collect();
+        let chars: Vec<_> = if text.len() <= max {
+            text.chars().collect()
+        } else {
+            // 多留了一个, 确保 ~ 出现
+            text.chars()
+                .enumerate()
+                .map_while(|(i, ch)| if i <= max { Some(ch) } else { None })
+                .collect()
+        };
+
+        // 总空间
+        let space = chars.len();
 
         // 可裁剪空间: abcxyz => abc~
         let trim = if fix { 0 } else { Self::get_trim(&chars, space) };
@@ -368,10 +376,10 @@ impl LimitObj {
 }
 
 pub trait LimitPackAble {
-    fn to_limit_obj(&self) -> LimitObj;
+    fn to_limit_obj(&self, max: usize) -> LimitObj;
 
     fn limit_pack(&self, limit: usize) -> String {
-        let mut root = self.to_limit_obj();
+        let mut root = self.to_limit_obj(limit);
         root.limit_as_root(limit);
         root.get_text()
     }
@@ -380,8 +388,8 @@ pub trait LimitPackAble {
 macro_rules! default_limit_pack {
     ($type:ident, $fix:expr) => {
         impl LimitPackAble for $type {
-            fn to_limit_obj(&self) -> LimitObj {
-                LimitObj::new_string(format!("{}", self), $fix)
+            fn to_limit_obj(&self, max: usize) -> LimitObj {
+                LimitObj::new_string(format!("{}", self), $fix, max)
             }
         }
     };
@@ -412,8 +420,8 @@ impl<T> LimitPackAble for &T
 where
     T: LimitPackAble + ?Sized,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        (**self).to_limit_obj()
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        (**self).to_limit_obj(max)
     }
 }
 
@@ -421,8 +429,8 @@ impl<T> LimitPackAble for &mut T
 where
     T: LimitPackAble + ?Sized,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        (**self).to_limit_obj()
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        (**self).to_limit_obj(max)
     }
 }
 
@@ -430,10 +438,10 @@ impl<T> LimitPackAble for Option<T>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
         match self {
-            Some(obj) => obj.to_limit_obj(),
-            None => LimitObj::new_string("None".to_string(), true),
+            Some(obj) => obj.to_limit_obj(max),
+            None => LimitObj::new_string("None".to_string(), true, 128),
         }
     }
 }
@@ -447,12 +455,12 @@ macro_rules! tuple {
     ( $($name:ident,)+ ) => (
         impl<$($name:LimitPackAble),+> LimitPackAble for ($($name,)+) where last_type!($($name,)+): ?Sized {
             #[allow(non_snake_case, unused_assignments)]
-            fn to_limit_obj(&self) -> LimitObj {
+            fn to_limit_obj(&self, max:usize) -> LimitObj {
                 let ($(ref $name,)+) = *self;
 
                 LimitObj::new_list(vec![
                     $(
-                        $name.to_limit_obj(),
+                        $name.to_limit_obj(max),
                     )+
                 ], ('(',')'), true)
             }
@@ -472,8 +480,15 @@ impl<T> LimitPackAble for [T]
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        LimitObj::new_list(self.iter().map(|x| x.to_limit_obj()).collect(), ('[', ']'), false)
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        LimitObj::new_list(
+            self.iter()
+                .enumerate()
+                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
+                .collect(),
+            ('[', ']'),
+            false,
+        )
     }
 }
 
@@ -481,8 +496,15 @@ impl<T, const N: usize> LimitPackAble for [T; N]
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        LimitObj::new_list(self.iter().map(|x| x.to_limit_obj()).collect(), ('[', ']'), false)
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        LimitObj::new_list(
+            self.iter()
+                .enumerate()
+                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
+                .collect(),
+            ('[', ']'),
+            false,
+        )
     }
 }
 
@@ -490,8 +512,15 @@ impl<T> LimitPackAble for Vec<T>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        LimitObj::new_list(self.iter().map(|x| x.to_limit_obj()).collect(), ('[', ']'), false)
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        LimitObj::new_list(
+            self.iter()
+                .enumerate()
+                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
+                .collect(),
+            ('[', ']'),
+            false,
+        )
     }
 }
 
@@ -499,8 +528,15 @@ impl<T> LimitPackAble for VecDeque<T>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        LimitObj::new_list(self.iter().map(|x| x.to_limit_obj()).collect(), ('[', ']'), false)
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        LimitObj::new_list(
+            self.iter()
+                .enumerate()
+                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
+                .collect(),
+            ('[', ']'),
+            false,
+        )
     }
 }
 
@@ -508,8 +544,15 @@ impl<T, S> LimitPackAble for HashSet<T, S>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
-        LimitObj::new_list(self.iter().map(|x| x.to_limit_obj()).collect(), ('{', '}'), false)
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
+        LimitObj::new_list(
+            self.iter()
+                .enumerate()
+                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
+                .collect(),
+            ('{', '}'),
+            false,
+        )
     }
 }
 
@@ -518,9 +561,11 @@ where
     K: LimitPackAble,
     V: LimitPackAble,
 {
-    fn to_limit_obj(&self) -> LimitObj {
+    fn to_limit_obj(&self, max: usize) -> LimitObj {
         LimitObj::new_dict(
-            self.iter().map(|(x, y)| (x.to_limit_obj(), y.to_limit_obj())).collect(),
+            self.iter()
+                .map(|(x, y)| (x.to_limit_obj(max), y.to_limit_obj(max)))
+                .collect(),
             ('{', '}'),
         )
     }
