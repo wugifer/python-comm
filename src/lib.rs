@@ -11,6 +11,9 @@ mod sql_date;
 #[cfg(feature = "use_sql")]
 mod sql_op;
 
+#[cfg(feature = "use_tokio")]
+mod tokio_helper;
+
 pub mod textsearcher;
 
 /// common basic functions.
@@ -41,6 +44,27 @@ pub mod use_basic {
 /// ## Usage
 ///
 /// ```
+/// use python_comm::use_limit_pack::*;
+///
+/// #[derive(LimitPack)]
+/// struct Abc {
+///     a: i32,
+///     b: &'static str,
+/// }
+///
+/// assert_eq!(Abc{a:1, b:"abcdefghijk"}.limit_pack(15), "(a:1,b:abcdef~)");
+/// ```
+///
+pub mod use_limit_pack {
+    pub use {
+        crate::limit_pack::{LimitObj, LimitPackAble},
+        python_comm_macros::LimitPack,
+    };
+}
+
+/// ## Usage
+///
+/// ```
 /// use python_comm::use_m::*;
 /// use std::fs::File;
 ///
@@ -63,30 +87,9 @@ pub mod use_m {
     pub use {
         crate::{
             m,
-            more_error::{AddMore, MoreError},
+            more_error::{AddMoreError, AsMoreError, LessError, MoreError},
         },
         python_comm_macros::auto_func_name,
-    };
-}
-
-/// ## Usage
-///
-/// ```
-/// use python_comm::use_limit_pack::*;
-///
-/// #[derive(LimitPack)]
-/// struct Abc {
-///     a: i32,
-///     b: &'static str,
-/// }
-///
-/// assert_eq!(Abc{a:1, b:"abcdefghijk"}.limit_pack(15), "(a:1,b:abcdef~)");
-/// ```
-///
-pub mod use_limit_pack {
-    pub use {
-        crate::limit_pack::{LimitObj, LimitPackAble},
-        python_comm_macros::LimitPack,
     };
 }
 
@@ -122,4 +125,9 @@ pub mod use_sql {
         },
         python_comm_macros::AsSqlModel,
     };
+}
+
+#[cfg(feature = "use_tokio")]
+pub mod use_tokio {
+    pub use crate::tokio_helper::{join_all, join_all_and_reduce, join_to_happy};
 }

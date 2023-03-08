@@ -58,7 +58,7 @@ impl fmt::Display for MoreError {
 }
 
 /// 给 Error 增加更多信息
-pub trait AddMore<T> {
+pub trait AddMoreError<T> {
     /// 附加文件名、行号、函数名、附加说明
     fn f<F>(self, file_line_func_func: (&str, u32, &str, F)) -> Result<T, MoreError>
     where
@@ -71,7 +71,19 @@ pub trait AddMore<T> {
     fn p(&self, file_line_func_text: (&str, u32, &str, &str));
 }
 
-impl<T, E> AddMore<T> for Result<T, E>
+/// 把 Error 转换为简单的 String MoreError
+pub trait AsMoreError<T> {
+    /// 附加文件名、行号、函数名、附加说明, 抛弃 Error 自身的内容
+    fn as_m(self, file_line_func_text: (&str, u32, &str, &str)) -> Result<T, MoreError>;
+}
+
+/// 合并外层的 MoreError 到内层
+pub trait LessError<T, E> {
+    /// Ok(Result) -> Result, Err(*) -> Err(*)
+    fn l(self) -> Result<T, E>;
+}
+
+impl<T, E> AddMoreError<T> for Result<T, E>
 where
     E: Error,
 {
@@ -122,7 +134,7 @@ where
     }
 }
 
-impl<T, E> AddMore<T> for &E
+impl<T, E> AddMoreError<T> for &E
 where
     E: Error,
 {
@@ -167,7 +179,7 @@ where
     }
 }
 
-impl<T> AddMore<T> for Result<T, MoreError> {
+impl<T> AddMoreError<T> for Result<T, MoreError> {
     /// 附加文件名、行号、函数名、附加说明
     fn f<F>(self, file_line_func_func: (&str, u32, &str, F)) -> Result<T, MoreError>
     where
@@ -215,7 +227,7 @@ impl<T> AddMore<T> for Result<T, MoreError> {
     }
 }
 
-impl<T> AddMore<T> for &MoreError {
+impl<T> AddMoreError<T> for &MoreError {
     /// 附加文件名、行号、函数名、附加说明
     fn f<F>(self, file_line_func_func: (&str, u32, &str, F)) -> Result<T, MoreError>
     where
@@ -254,5 +266,29 @@ impl<T> AddMore<T> for &MoreError {
             )
             .detail()
         );
+    }
+}
+
+impl<T, E> AsMoreError<T> for Result<T, E>
+where
+    E: Error,
+{
+    /// 把 Error 转换为简单的 String MoreError
+    fn as_m(self, file_line_func_text: (&str, u32, &str, &str)) -> Result<T, MoreError> {
+        self.or_else(|_| {
+            Err(MoreError::new(
+                file_line_func_text.0,
+                file_line_func_text.1,
+                file_line_func_text.2,
+                file_line_func_text.3,
+            ))
+        })
+    }
+}
+
+impl<T, E> LessError<T, E> for Result<Result<T, E>, E> {
+    /// Ok(Result) -> Result, Err(*) -> Err(*)
+    fn l(self) -> Result<T, E> {
+        self.and_then(|x| x)
     }
 }
