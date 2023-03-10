@@ -68,21 +68,19 @@ where
 
 /// 从 join! 改造而来, 等待 futures 全部完成, 按完成顺序 reduce 结果
 /// 1. Pin::new_unchecked 是否正确存疑
-pub async fn join_all_and_reduce<F, R, A, B>(mut futures: Vec<F>, reduce: R, reduce_args: &A) -> Option<B>
+pub async fn join_all_and_reduce<F, R, A, B>(mut futures: Vec<F>, reduce: R, reduce_args: &A, init_value: &mut B)
 where
     F: Future,
-    R: Fn(&mut Option<B>, F::Output, &A, usize) -> (),
+    R: Fn(&mut B, F::Output, &A, usize) -> (),
 {
     // 初始化, poll_fn 内是一个 poll 函数, 会被执行多次, 每次从不同的 future 开始检查
     let mut results: Vec<bool> = futures.iter().map(|_| false).collect();
     let size = futures.len();
     let mut first = 0;
-    let mut best = None;
 
     // 改为引用, 这样可以多次执行 poll_fn + move
     let future_refs = &mut futures;
     let result_refs = &mut results;
-    let best_ref = &mut best;
 
     poll_fn(move |cx| {
         // 记录本次 poll_fn 的成果
@@ -107,7 +105,7 @@ where
                 }
                 Ready(result) => {
                     result_refs[pos] = true;
-                    reduce(best_ref, result, reduce_args, pos);
+                    reduce(init_value, result, reduce_args, pos);
                 }
             }
         }
@@ -122,8 +120,6 @@ where
         }
     })
     .await;
-
-    best
 }
 
 /// 从 join! 改造而来, futures 中的部分任务完成后, 如果 is_happy() 返回 true, 结束全部 futures
