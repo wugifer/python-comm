@@ -37,7 +37,7 @@ impl SqlDate {
 
     #[auto_func_name]
     pub fn new(date: String) -> Result<Self, MoreError> {
-        let ndate = bjtc_sd(&date).m(m!(__func__))?;
+        let ndate = bjtc_sd(&date).m(m!(fname))?;
         Ok(Self { ndate, sdate: date })
     }
 
@@ -61,7 +61,7 @@ impl SqlDate {
     #[auto_func_name]
     #[inline]
     pub fn set_s(&mut self, date: String) -> Result<(), MoreError> {
-        self.ndate = bjtc_sd(&date).m(m!(__func__))?;
+        self.ndate = bjtc_sd(&date).m(m!(fname))?;
         self.sdate = date;
 
         Ok(())
@@ -150,7 +150,7 @@ impl SqlTime {
 
     #[auto_func_name]
     pub fn new(time: String) -> Result<Self, MoreError> {
-        let ntime = bjtc_bt(&time).m(m!(__func__))?;
+        let ntime = bjtc_bt(&time).m(m!(fname))?;
         Ok(Self { ntime, stime: time })
     }
 
@@ -174,7 +174,7 @@ impl SqlTime {
     #[auto_func_name]
     #[inline]
     pub fn set_s(&mut self, time: String) -> Result<(), MoreError> {
-        self.ntime = bjtc_bt(&time).m(m!(__func__))?;
+        self.ntime = bjtc_bt(&time).m(m!(fname))?;
         self.stime = time;
 
         Ok(())

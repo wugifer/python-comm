@@ -72,7 +72,7 @@ pub mod use_limit_pack {
 /// #[auto_func_name]
 /// #[auto_func_name]
 /// fn has_error(n: i32) -> Result<(), MoreError> {
-///     File::open("not exist").m(m!(__func__))?;
+///     File::open("not exist").m(m!(fname))?;
 ///
 ///    Ok(())
 /// }

@@ -276,9 +276,7 @@ impl TextSearcher {
 
     #[auto_func_name]
     pub fn load(text: String) -> Result<Self, MoreError> {
-        Ok(serde_json::from_str::<TextSearcherForSerde>(&text)
-            .m(m!(__func__))?
-            .to())
+        Ok(serde_json::from_str::<TextSearcherForSerde>(&text).m(m!(fname))?.to())
     }
 
     /// 查找
@@ -404,7 +402,7 @@ impl TextSearcher {
 
     #[auto_func_name]
     pub fn save(&self) -> Result<String, MoreError> {
-        serde_json::to_string(&TextSearcherForSerde::from(self)).m(m!(__func__))
+        serde_json::to_string(&TextSearcherForSerde::from(self)).m(m!(fname))
     }
 
     /// 替换
@@ -795,7 +793,7 @@ impl TextSearcherManager {
     pub fn get_text_searcher(&mut self, tsid: i32) -> Result<TextSearcher, MoreError> {
         self.tss
             .remove(&tsid)
-            .ok_or_else(|| m!(__func__, &format!("指定的 TextSearcher={} 无效", tsid), "more"))
+            .ok_or_else(|| m!(fname, &format!("指定的 TextSearcher={} 无效", tsid), "more"))
     }
 
     /// 构造

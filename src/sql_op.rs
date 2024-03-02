@@ -35,7 +35,7 @@ impl DbPool {
                     .user(Some(&self.args.user))
                     .pass(Some(&self.args.password))
                     .db_name(Some(&self.args.db_name));
-                let pool = Pool::new_manual(3, 5, opts).m(m!(__func__))?;
+                let pool = Pool::new_manual(3, 5, opts).m(m!(fname))?;
 
                 self.pool = Some(pool.clone());
                 Ok(pool)
@@ -46,7 +46,7 @@ impl DbPool {
     #[auto_func_name]
     /// 获取可用连接
     fn _get(&mut self) -> Result<PooledConn, MoreError> {
-        self._create().m(m!(__func__))?.get_conn().m(m!(__func__))
+        self._create().m(m!(fname))?.get_conn().m(m!(fname))
     }
 
     #[auto_func_name]
@@ -56,10 +56,10 @@ impl DbPool {
         Self: 'static,
     {
         self._get()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .exec_iter(sql, &params)
             .map(|x| x.last_insert_id())
-            .f(m!(__func__, || { format!("{} {:?}", sql, params) }))
+            .f(m!(fname, || { format!("{} {:?}", sql, params) }))
     }
 
     #[auto_func_name]
@@ -69,9 +69,9 @@ impl DbPool {
         Self: 'static,
     {
         self._get()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .exec_drop(sql, &params)
-            .f(m!(__func__, || { format!("{}: {:?}", sql, &params) }))
+            .f(m!(fname, || { format!("{}: {:?}", sql, &params) }))
     }
 
     pub fn new(args: &'static DbPoolArgs) -> Self {
@@ -139,7 +139,7 @@ pub trait SqlModel {
     /// 增
     fn create(&self) -> Result<Option<u64>, MoreError> {
         Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .get_id(
                 &format!(
                     "INSERT INTO {} ({}) VALUES ({})",
@@ -149,19 +149,19 @@ pub trait SqlModel {
                 ),
                 self.make_fields_vi(),
             )
-            .m(m!(__func__))
+            .m(m!(fname))
     }
 
     #[auto_func_name]
     /// 删
     fn delete(condition: &str, params: Params) -> Result<(), MoreError> {
         Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .get_nothing(
                 &format!("DELETE FROM {} WHERE {}", Self::table_name(), condition),
                 params,
             )
-            .m(m!(__func__))
+            .m(m!(fname))
     }
 
     #[auto_func_name]
@@ -172,14 +172,14 @@ pub trait SqlModel {
         T: FromRow,
     {
         match Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             ._get()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .exec_first_opt(sql, &params)
-            .f(m!(__func__, || { format!("{}: {:?}", sql, &params) }))?
+            .f(m!(fname, || { format!("{}: {:?}", sql, &params) }))?
         {
             Some(Ok(row)) => Ok(Some(row)),
-            Some(Err(err)) => Err(err).m(m!(__func__)),
+            Some(Err(err)) => Err(err).m(m!(fname)),
             None => Ok(None),
         }
     }
@@ -193,16 +193,16 @@ pub trait SqlModel {
     {
         // 全部结果
         let rows = Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             ._get()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .exec_opt(sql, &params)
-            .f(m!(__func__, || { format!("{}: {:?}", sql, &params) }))?;
+            .f(m!(fname, || { format!("{}: {:?}", sql, &params) }))?;
 
         // 如果有 FromRowError, 抛出异常, 这样后续可以 unwrap (map 中不可抛出异常)
         for (i, row) in rows.iter().enumerate() {
             if let Err(err) = row {
-                return Err(err).f(m!(__func__, || { format!("{}: {:?}, row[{}]", sql, &params, i) }));
+                return Err(err).f(m!(fname, || { format!("{}: {:?}, row[{}]", sql, &params, i) }));
             }
         }
 
@@ -213,7 +213,7 @@ pub trait SqlModel {
     #[auto_func_name]
     fn save_as(&self, id: u32) -> Result<(), MoreError> {
         Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .get_nothing(
                 &format!(
                     "UPDATE {} SET {} WHERE id={}",
@@ -223,7 +223,7 @@ pub trait SqlModel {
                 ),
                 self.make_fields_vi(),
             )
-            .m(m!(__func__))
+            .m(m!(fname))
     }
 
     #[auto_func_name]
@@ -233,9 +233,9 @@ pub trait SqlModel {
         Self: 'static + Sized + FromRow,
     {
         match Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             ._get()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .exec_first_opt(
                 &format!(
                     "SELECT {} FROM {} {}",
@@ -245,10 +245,10 @@ pub trait SqlModel {
                 ),
                 &params,
             )
-            .f(m!(__func__, || { format!("{}: {:?}", where_sql, &params) }))?
+            .f(m!(fname, || { format!("{}: {:?}", where_sql, &params) }))?
         {
             Some(Ok(row)) => Ok(Some(row)),
-            Some(Err(err)) => Err(err).m(m!(__func__)),
+            Some(Err(err)) => Err(err).m(m!(fname)),
             None => Ok(None),
         }
     }
@@ -261,9 +261,9 @@ pub trait SqlModel {
     {
         // 全部结果
         let rows = Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             ._get()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .exec_opt(
                 &format!(
                     "SELECT {} FROM {} {}",
@@ -273,12 +273,12 @@ pub trait SqlModel {
                 ),
                 &params,
             )
-            .f(m!(__func__, || { format!("{}: {:?}", where_sql, &params) }))?;
+            .f(m!(fname, || { format!("{}: {:?}", where_sql, &params) }))?;
 
         // 如果有 FromRowError, 抛出异常, 这样后续可以 unwrap (map 中不可抛出异常)
         for (i, row) in rows.iter().enumerate() {
             if let Err(err) = row {
-                return Err(err).f(m!(__func__, || { format!("{}: {:?}, row[{}]", where_sql, &params, i) }));
+                return Err(err).f(m!(fname, || { format!("{}: {:?}, row[{}]", where_sql, &params, i) }));
             }
         }
 
@@ -290,11 +290,11 @@ pub trait SqlModel {
     /// 改
     fn update(fields_ei: &str, condition: &str, params: Params) -> Result<(), MoreError> {
         Self::lock()
-            .m(m!(__func__))?
+            .m(m!(fname))?
             .get_nothing(
                 &format!("UPDATE {} SET {} WHERE {}", Self::table_name(), fields_ei, condition),
                 params,
             )
-            .m(m!(__func__))
+            .m(m!(fname))
     }
 }

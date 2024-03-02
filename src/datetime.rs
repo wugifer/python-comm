@@ -165,21 +165,21 @@ pub fn bj_timestamp_millis() -> i64 {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_bd(text: &str) -> Result<NaiveDate, MoreError> {
-    bjtc_sd(&bjtc_bs(text)).m(m!(__func__))
+    bjtc_sd(&bjtc_bs(text)).m(m!(fname))
 }
 
 /// See bjtc_bd
 #[inline]
 #[auto_func_name]
 pub fn bjtc_bf(text: &str) -> Result<f64, MoreError> {
-    bjtc_sf(&bjtc_bs(text)).m(m!(__func__))
+    bjtc_sf(&bjtc_bs(text)).m(m!(fname))
 }
 
 /// See bjtc_bd
 #[inline]
 #[auto_func_name]
 pub fn bjtc_bn(text: &str) -> Result<i64, MoreError> {
-    bjtc_sn(&bjtc_bs(text)).m(m!(__func__))
+    bjtc_sn(&bjtc_bs(text)).m(m!(fname))
 }
 
 /// See bjtc_bd
@@ -192,7 +192,7 @@ pub fn bjtc_bs(text: &str) -> String {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_bt(text: &str) -> Result<DateTime<FixedOffset>, MoreError> {
-    bjtc_st(&bjtc_bs(text)).m(m!(__func__))
+    bjtc_st(&bjtc_bs(text)).m(m!(fname))
 }
 
 /// See bjtc_bd
@@ -229,7 +229,7 @@ pub fn bjtc_dt(date: &NaiveDate) -> DateTime<FixedOffset> {
 #[auto_func_name]
 pub fn bjtc_fb(timestamp: f64) -> Result<String, MoreError> {
     bjtc_ft(timestamp)
-        .m(m!(__func__, &format!("timestamp={}", timestamp)))
+        .m(m!(fname, &format!("timestamp={}", timestamp)))
         .map(|time| bjtc_tb(&time))
 }
 
@@ -238,7 +238,7 @@ pub fn bjtc_fb(timestamp: f64) -> Result<String, MoreError> {
 #[auto_func_name]
 pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, MoreError> {
     bjtc_ft(timestamp)
-        .m(m!(__func__, &format!("timestamp={}", timestamp)))
+        .m(m!(fname, &format!("timestamp={}", timestamp)))
         .map(|time| bjtc_td(&time))
 }
 
@@ -247,7 +247,7 @@ pub fn bjtc_fd(timestamp: f64) -> Result<NaiveDate, MoreError> {
 #[auto_func_name]
 pub fn bjtc_fs(timestamp: f64) -> Result<String, MoreError> {
     bjtc_ft(timestamp)
-        .m(m!(__func__, &format!("timestamp={}", timestamp)))
+        .m(m!(fname, &format!("timestamp={}", timestamp)))
         .map(|time| bjtc_ts(&time))
 }
 
@@ -259,7 +259,7 @@ pub fn bjtc_ft(timestamp: f64) -> Result<DateTime<FixedOffset>, MoreError> {
         timestamp as i64,
         ((timestamp - (timestamp as i64 as f64)) * 1000.0) as u32,
     )
-    .m(m!(__func__, &format!("timestamp={}", timestamp)))
+    .m(m!(fname, &format!("timestamp={}", timestamp)))
 }
 
 // nx
@@ -269,7 +269,7 @@ pub fn bjtc_ft(timestamp: f64) -> Result<DateTime<FixedOffset>, MoreError> {
 #[auto_func_name]
 pub fn bjtc_nb(timestamp: i64, millis: u32) -> Result<String, MoreError> {
     bjtc_nt(timestamp, millis)
-        .m(m!(__func__, &format!("timestamp={}, millis={}", timestamp, millis)))
+        .m(m!(fname, &format!("timestamp={}, millis={}", timestamp, millis)))
         .map(|time| bjtc_tb(&time))
 }
 
@@ -278,7 +278,7 @@ pub fn bjtc_nb(timestamp: i64, millis: u32) -> Result<String, MoreError> {
 #[auto_func_name]
 pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, MoreError> {
     bjtc_nt(timestamp, millis)
-        .m(m!(__func__, &format!("timestamp={}, millis={}", timestamp, millis)))
+        .m(m!(fname, &format!("timestamp={}, millis={}", timestamp, millis)))
         .map(|time| bjtc_td(&time))
 }
 
@@ -287,7 +287,7 @@ pub fn bjtc_nd(timestamp: i64, millis: u32) -> Result<NaiveDate, MoreError> {
 #[auto_func_name]
 pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, MoreError> {
     bjtc_nt(timestamp, millis)
-        .m(m!(__func__, &format!("timestamp={}, millis={}", timestamp, millis)))
+        .m(m!(fname, &format!("timestamp={}, millis={}", timestamp, millis)))
         .map(|time| bjtc_ts(&time))
 }
 
@@ -297,7 +297,7 @@ pub fn bjtc_ns(timestamp: i64, millis: u32) -> Result<String, MoreError> {
 pub fn bjtc_nt(timestamp: i64, millis: u32) -> Result<DateTime<FixedOffset>, MoreError> {
     DateTime::from_timestamp(timestamp, millis * 1000000)
         .map(|t| t.with_timezone(&FixedOffset::east_opt(8 * 3600).unwrap()))
-        .ok_or(m!(__func__, &format!("timestamp={}", timestamp), "more"))
+        .ok_or(m!(fname, &format!("timestamp={}", timestamp), "more"))
 }
 
 // sx
@@ -313,7 +313,7 @@ pub fn bjtc_sb(text: &str) -> String {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_sd(text: &str) -> Result<NaiveDate, MoreError> {
-    NaiveDate::parse_from_str(&text[..10], "%Y-%m-%d").m(m!(__func__, text))
+    NaiveDate::parse_from_str(&text[..10], "%Y-%m-%d").m(m!(fname, text))
 }
 
 /// See bjtc_bd
@@ -321,7 +321,7 @@ pub fn bjtc_sd(text: &str) -> Result<NaiveDate, MoreError> {
 #[auto_func_name]
 pub fn bjtc_sf(text: &str) -> Result<f64, MoreError> {
     bjtc_st(text)
-        .m(m!(__func__, &format!("text={}", text)))
+        .m(m!(fname, &format!("text={}", text)))
         .map(|time| bjtc_tf(&time))
 }
 
@@ -330,7 +330,7 @@ pub fn bjtc_sf(text: &str) -> Result<f64, MoreError> {
 #[auto_func_name]
 pub fn bjtc_sn(text: &str) -> Result<i64, MoreError> {
     bjtc_st(text)
-        .m(m!(__func__, &format!("text={}", text)))
+        .m(m!(fname, &format!("text={}", text)))
         .map(|time| bjtc_tn(&time))
 }
 
@@ -338,7 +338,7 @@ pub fn bjtc_sn(text: &str) -> Result<i64, MoreError> {
 #[inline]
 #[auto_func_name]
 pub fn bjtc_st(text: &str) -> Result<DateTime<FixedOffset>, MoreError> {
-    DateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S%:z").m(m!(__func__, text))
+    DateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S%:z").m(m!(fname, text))
 }
 
 // tx
@@ -428,14 +428,14 @@ pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
 #[auto_func_name]
 pub fn bjtc_to_duration(anchor: &DateTime<Utc>, timestamp_millis: i64) -> Result<time::Duration, MoreError> {
     let elapsed = bjtc_nt(timestamp_millis / 1000, (timestamp_millis % 1000) as u32)
-        .m(m!(__func__, &format!("timestamp={}", timestamp_millis)))?
+        .m(m!(fname, &format!("timestamp={}", timestamp_millis)))?
         - anchor.with_timezone(&FixedOffset::east_opt(8 * 3600).unwrap());
 
     if elapsed.num_milliseconds() >= 0 {
         Ok(time::Duration::from_millis(elapsed.num_milliseconds() as u64))
     } else {
         m!(
-            __func__,
+            fname,
             &format!("{} 结果为负值 {}", timestamp_millis, elapsed.num_seconds()),
             "result"
         )
