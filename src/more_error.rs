@@ -9,7 +9,7 @@ impl MoreError {
     /// 从 Error 构造
     fn from_error<E>(err: &E, file: &str, line: u32, func: &str, text: &str) -> Self
     where
-        E: Error,
+        E: fmt::Debug,
     {
         Self {
             text: format!("Error: {}:{:3} {}() {}\nError: {:?}", file, line, func, text, err),
@@ -256,7 +256,7 @@ impl<T> AddMoreError<T> for &MoreError {
 
 impl<T, E> AsMoreError<T> for Result<T, E>
 where
-    E: Error,
+    E: fmt::Debug,
 {
     /// 附加文件名、行号、函数名、附加说明, 抛弃 Error 自身的内容
     fn as_m(self, file_line_func_text: (&str, u32, &str, &str)) -> Result<T, MoreError> {

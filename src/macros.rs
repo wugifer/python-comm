@@ -6,7 +6,7 @@
 /// use python_comm::use_basic::*;
 ///
 /// let version = crate_version!();
-/// assert_eq!(&version[0..3], "0.3");
+/// assert_eq!(&version[0..3], "0.4");
 /// ```
 ///
 #[macro_export]

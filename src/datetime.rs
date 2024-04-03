@@ -421,7 +421,10 @@ pub fn bjtc_tt(time: &DateTime<FixedOffset>) -> DateTime<FixedOffset> {
 /// ```
 ///
 pub fn bjtc_from_duration(anchor: &DateTime<Utc>, millis: f64) -> i64 {
-    (*anchor + chrono::Duration::milliseconds(millis as i64)).timestamp_millis()
+    match chrono::Duration::try_milliseconds(millis as i64) {
+        Some(dur) => (*anchor + dur).timestamp_millis(),
+        None => anchor.timestamp_micros(),
+    }
 }
 
 /// Convert timestamp to duration, see bjtc_from_duration
