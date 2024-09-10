@@ -1,395 +1,200 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-// str~         单纯字符串, 可裁剪长度
-// fix          由整型等转换而成的字符串, 不可裁剪长度
-// (obj~,)      元组, 不可裁剪数量
-// [obj~^]      列表, 可裁剪数量
-// {obj~:obj~^} 字典, 可裁剪数量
-// {obj~^}      集合, 可裁剪数量
-// ~  字符串被截断
-// ^  列表/字典/集合被截断
-// 裁剪过程
-// 1. 当前
-//     可裁剪的最长字符串有 n 个
-//     可裁剪的列表/字典/集合有若干个, 其中裁剪效果最差的能减少 m 个字符
-// 2. 如果 m < n, 裁剪掉列表/字典/集合的一个元素, 否则裁剪掉一个字符
-
-pub struct LimitObj {
-    uid: u32,                              // 裁剪过程中的唯一编号
-    chars: Vec<char>,                      // 裁剪后的字符串, 不用 String, 后者 utf-8 切片困难
-    v1: Option<Vec<LimitObj>>,             // 裁剪后的列表
-    v2: Option<Vec<(LimitObj, LimitObj)>>, // 裁剪后的字典
-    c: (char, char),                       // 界定符, () 或 [] 或 {}
-    space: usize,                          // 表示为 String 应占据的空间
-    trim: usize,                           // 当前状态可 trim 的空间, Vec 仅 trim 最后一项
-    more: usize,                           // 1 = 已产生 trim 占位符(string 类型不参与)
+pub struct Limit {
+    array_limit: usize,
+    dict_limit: usize,
+    str_limit: usize,
+    pair_seq: u32,
+    pair_stack: Vec<u32>,
 }
 
-impl LimitObj {
-    /// 获取 trim 空间最大的 STRING 类型
-    fn get_max_string_trim(&self, mut string_trim: usize, uids: &mut Vec<u32>) -> usize {
-        // string 类型
-        if self.chars.len() > 0 {
-            if self.trim > string_trim {
-                uids.clear();
-            }
-            if self.trim >= string_trim {
-                uids.push(self.uid);
-                return self.trim;
-            }
-            return string_trim;
-        }
-
-        // list 类型
-        if let Some(v) = &self.v1 {
-            for obj in v {
-                string_trim = obj.get_max_string_trim(string_trim, uids);
-            }
-        }
-
-        // dict 类型
-        if let Some(v) = &self.v2 {
-            for (k, v) in v {
-                string_trim = k.get_max_string_trim(string_trim, uids);
-                string_trim = v.get_max_string_trim(string_trim, uids);
-            }
-        }
-
-        string_trim
-    }
-
-    /// 获取 trim 空间最小的 LIST/MAP/TUPLE 类型, list_trim = (trim, len, uid), trim/len 参与比较
-    fn get_min_list_trim(&self, mut list_trim: (usize, usize, u32)) -> (usize, usize, u32) {
-        // 递归获取
-        if let Some(v) = &self.v1 {
-            for obj in v {
-                list_trim = obj.get_min_list_trim(list_trim);
-            }
-        }
-
-        // 递归获取
-        if let Some(v) = &self.v2 {
-            for (k, v) in v {
-                list_trim = k.get_min_list_trim(list_trim);
-                list_trim = v.get_min_list_trim(list_trim);
-            }
-        }
-
-        // 无法裁剪
-        if self.trim == 0 {
-            return list_trim;
-        }
-
-        let mut trim = (self.trim, 1);
-        if let Some(v) = &self.v1 {
-            trim = (trim.0, v.len() + 1)
-        }
-        if let Some(v) = &self.v2 {
-            trim = (trim.0, v.len() + 1)
-        }
-
-        // 更优, 比较 trim/len
-        if (self.v1.is_some() || self.v2.is_some())
-            && self.trim > 0
-            && (list_trim.0 == usize::MAX || trim.0 * list_trim.1 < list_trim.0 * trim.1)
-        {
-            return (trim.0, trim.1, self.uid);
-        }
-
-        // 不动
-        list_trim
-    }
-
-    /// 获取最终文本
-    fn get_text(&self) -> String {
-        // string 类型
-        if self.chars.len() > 0 {
-            return self.chars.iter().map(|ch| ch.to_string()).collect::<Vec<_>>().join("");
-        }
-
-        // list 类型
-        if let Some(v) = &self.v1 {
-            return format!(
-                "{}{}{}{}",
-                self.c.0,
-                v.iter().map(|x| x.get_text()).collect::<Vec<_>>().join(","),
-                if self.more == 1 { "^" } else { "" },
-                self.c.1
-            );
-        }
-
-        // dict 类型
-        if let Some(v) = &self.v2 {
-            return format!(
-                "{}{}{}{}",
-                self.c.0,
-                v.iter()
-                    .map(|x| format!("{}:{}", x.0.get_text(), x.1.get_text()))
-                    .collect::<Vec<_>>()
-                    .join(","),
-                if self.more == 1 { "^" } else { "" },
-                self.c.1
-            );
-        }
-
-        // string 类型, 空串无法进入第一个 if 流程
-        "".to_string()
-    }
-
-    /// 获取 trim 空间: 替换为 ~ 后减少的空间
-    fn get_trim(chars: &Vec<char>, total: usize) -> usize {
-        let mut sum_size = 0;
-        for ch in chars {
-            if sum_size >= 3 {
-                // 从这里开始换成 ~
-                return total - (sum_size + 1);
-            }
-            sum_size += ch.len_utf8();
-        }
-
-        // 始终不能 >= 3, 不必 trim
-        return 0;
-    }
-
-    /// 限制最终文本长度
-    fn limit_as_root(&mut self, max_size: usize) {
-        self.set_uid(1);
-
-        while self.space > max_size {
-            // 统计 string, list 类型, 假定字段总量很小, 不优化统计过程
-            let mut uids = Vec::new();
-            let string_trim = self.get_max_string_trim(1, &mut uids);
-            let (list_trim, list_len, uid) = self.get_min_list_trim((usize::MAX, 1, 0));
-
-            if uids.len() == 0 {
-                if uid == 0 {
-                    // 无 trim 空间
-                    break;
-                } else {
-                    // 只能 trim list
-                    self.trim_match(&vec![uid]);
-                }
-            } else {
-                if uid == 0 {
-                    // 只能 trim string
-                    self.trim_match(&uids);
-                } else {
-                    // list_trim / list_len vs 1 / string_trim * count
-                    if list_trim * string_trim < 1 * list_len * uids.len() {
-                        // 优先 trim list
-                        self.trim_match(&vec![uid]);
-                    } else {
-                        self.trim_match(&uids);
-                    }
-                }
-            }
-        }
-    }
-
-    /// 构造 dict 类型
-    pub fn new_dict(v: Vec<(LimitObj, LimitObj)>, c: (char, char)) -> Self {
-        // 总空间: {a:x,b:y,c:z} => {} a:x b:y c:z , ,
-        let space = 2 + v.iter().fold(0, |x, y| x + y.0.space + 1 + y.1.space) + (v.len().max(1) - 1);
-
-        // 可裁剪空间: {a:x,b:y,c:z} => {a:x,b:y^}
-        let trim = if v.len() > 1 {
-            v[v.len() - 1].0.space + 1 + v[v.len() - 1].1.space
-        } else {
-            0
-        };
-
+impl Limit {
+    /// 构造
+    pub fn clone(&self, str_limit: usize) -> Self {
         Self {
-            v2: Some(v),
-            c,
-            space,
-            trim,
-            ..Self::new_empty()
+            array_limit: self.array_limit,
+            dict_limit: self.dict_limit,
+            str_limit,
+            pair_seq: self.pair_seq,
+            pair_stack: Vec::new(),
         }
     }
 
     /// 构造
-    fn new_empty() -> Self {
+    pub fn new(array_limit: usize, dict_limit: usize, str_limit: usize) -> Self {
         Self {
-            uid: 0,
-            chars: Vec::new(),
-            v1: None,
-            v2: None,
-            c: (' ', ' '),
-            space: 0,
-            trim: 0,
-            more: 0,
+            array_limit,
+            dict_limit,
+            str_limit,
+            pair_seq: 0,
+            pair_stack: Vec::new(),
         }
     }
 
-    /// 构造, uid 后续统一设置
-    pub fn new_list(v: Vec<LimitObj>, c: (char, char), fix: bool) -> Self {
-        // 总空间: [x,y,z] => [] x y z , ,
-        let space = 2 + v.iter().fold(0, |x, y| x + y.space) + (v.len().max(1) - 1);
+    /// 构造 dict 类型
+    pub fn new_dict<T1, T2>(&mut self, data: &Vec<(T1, T2)>) -> String
+    where
+        T1: LimitPackAble,
+        T2: LimitPackAble,
+    {
+        // 左标识
+        let pair_seq = self.pair_seq;
+        let mut text = format!("{}{} ", '{', pair_seq);
+        self.pair_seq += 1;
 
-        // 可裁剪空间: [x,y,z] => [x,y^]
-        let trim = if fix {
+        let skip = if data.len() <= self.dict_limit {
             0
         } else {
-            if v.len() > 1 {
-                v[v.len() - 1].space
-            } else {
-                0
-            }
+            data.len() - self.dict_limit / 2 * 2
         };
-
-        Self {
-            v1: Some(v),
-            c,
-            space,
-            trim,
-            ..Self::new_empty()
+        for (i, (k, v)) in data.iter().enumerate() {
+            if skip == 0 || i < self.dict_limit / 2 || i >= self.dict_limit / 2 + skip {
+                // 前半部 or 后半部
+                let k_text = k.to_limit_str(self);
+                let v_text = v.to_limit_str(self);
+                text += &format!("{}:{}{}", k_text, v_text, if i < data.len() - 1 { "," } else { "" });
+            } else if i == self.dict_limit / 2 {
+                // 第一个 skip
+                text += &format!("...{}...", skip);
+            } else {
+                // 其它 skip
+            }
         }
+
+        // 右标识
+        text += &format!("{}{}{}", if data.len() > 0 { " " } else { "" }, pair_seq, '}');
+
+        text
     }
 
-    /// 构造, uid 后续统一设置
-    pub fn new_string(text: String, fix: bool, max: usize) -> Self {
-        // 拆解
-        let chars: Vec<_> = if text.len() <= max {
-            text.chars().collect()
+    /// 构造 list 类型
+    pub fn new_list<T>(&mut self, data: &Vec<T>) -> String
+    where
+        T: LimitPackAble,
+    {
+        // 左标识
+        let pair_seq = self.pair_seq;
+        let mut text = format!("{}{} ", '[', pair_seq);
+        self.pair_seq += 1;
+
+        let skip = if data.len() <= self.array_limit {
+            0
         } else {
-            // 多留了一个, 确保 ~ 出现
-            text.chars()
-                .enumerate()
-                .map_while(|(i, ch)| if i <= max { Some(ch) } else { None })
-                .collect()
+            data.len() - self.array_limit / 2 * 2
         };
 
-        // 总空间
-        let space = chars.len();
-
-        // 可裁剪空间: abcxyz => abc~
-        let trim = if fix { 0 } else { Self::get_trim(&chars, space) };
-
-        Self {
-            chars,
-            space,
-            trim,
-            ..Self::new_empty()
-        }
-    }
-
-    /// 设置裁剪过程中的唯一编号
-    fn set_uid(&mut self, mut uid: u32) -> u32 {
-        self.uid = uid;
-        uid = uid + 1;
-
-        // 递归
-        if let Some(v) = &mut self.v1 {
-            for obj in v {
-                uid = obj.set_uid(uid);
-            }
-        }
-
-        // 递归
-        if let Some(v) = &mut self.v2 {
-            for (k, v) in v {
-                uid = k.set_uid(uid);
-                uid = v.set_uid(uid);
-            }
-        }
-
-        uid
-    }
-
-    /// 裁剪, 假定调用者保证可裁剪
-    fn trim(&mut self) -> usize {
-        // string 类型
-        if self.chars.len() >= 2 {
-            let last = self.chars.pop().unwrap(); // len() >= 2 确保 last() 有效
-            let prev = self.chars.pop().unwrap(); // len() >= 2 确保 last() 有效
-            let trim = last.len_utf8() + prev.len_utf8() - 1;
-            self.chars.push('~');
-            self.space -= trim;
-            self.trim -= trim;
-            return trim;
-        }
-
-        // list 类型, [x,y,z] => [x,y^] or [x,y,z^] => [x,y^]
-        if let Some(v) = &mut self.v1 {
-            let cut = v[v.len() - 1].space + self.more;
-            v.remove(v.len() - 1);
-            self.space -= cut;
-            self.trim = if v.len() > 1 {
-                v[v.len() - 1].space + self.more
+        for (i, v) in data.iter().enumerate() {
+            if skip == 0 || i < self.array_limit / 2 || i >= self.array_limit / 2 + skip {
+                // 前半部 or 后半部
+                let v_text = v.to_limit_str(self);
+                text += &format!("{}{}", v_text, if i < data.len() - 1 { "," } else { "" });
+            } else if i == self.array_limit / 2 {
+                // 第一个 skip
+                text += &format!("...{}...", skip);
             } else {
-                0
-            };
-            self.more = 1;
-            return cut;
+                // 其它 skip
+            }
         }
 
-        // dict 类型, {a:x,b:y,c:z} => {a:x,b:y^} or {a:x,b:y,c:z^} => {a:x,b:y^}
-        if let Some(v) = &mut self.v2 {
-            let cut = v[v.len() - 1].0.space + 1 + v[v.len() - 1].1.space + self.more;
-            v.remove(v.len() - 1);
-            self.space -= cut;
-            self.trim = if v.len() > 1 {
-                v[v.len() - 1].0.space + 1 + v[v.len() - 1].1.space + self.more
-            } else {
-                0
-            };
-            self.more = 1;
-            return cut;
-        }
-
-        // 正常不应该走到这里, 返回 1 的目的是: 即使什么也没做, limit 循环会因此而结束
-        return 1;
+        // 右标识
+        text += &format!("{}{}{}", if data.len() > 0 { " " } else { "" }, pair_seq, ']');
+        text
     }
 
-    /// 对 uids 中的元素执行 trim
-    fn trim_match(&mut self, uids: &Vec<u32>) -> usize {
-        // string 类型
-        if self.chars.len() >= 2 && uids.contains(&self.uid) {
-            return self.trim();
+    /// 构造 string 类型
+    pub fn new_string(&self, text: String) -> String {
+        let len = text.len();
+
+        if self.str_limit <= 10 || len <= self.str_limit {
+            // 完整保留
+            text
+        } else {
+            // {左 half}...{skip}...{右 half}
+            let full: Vec<char> = text.chars().collect();
+            let half = self.str_limit / 2;
+
+            let mut l: Vec<_> = full
+                .iter()
+                .enumerate()
+                .map_while(|(i, ch)| if i < half { Some(*ch) } else { None })
+                .collect();
+            let mut m: Vec<_> = format!("...{}...", len - self.str_limit).chars().collect();
+            let mut r: Vec<_> = full
+                .iter()
+                .rev()
+                .enumerate()
+                .map_while(|(i, ch)| if i < half { Some(*ch) } else { None })
+                .collect();
+            r.reverse();
+            l.append(&mut m);
+            l.append(&mut r);
+            l.iter().map(|ch| ch.to_string()).collect::<Vec<_>>().join("")
+        }
+    }
+
+    /// 构造 tuple 类型
+    pub fn new_tuple(&mut self, data: &Vec<String>) -> String {
+        // 左标识
+        let pair_seq = self.pair_seq;
+        let mut text = format!("{}{} ", '(', pair_seq);
+        self.pair_seq += 1;
+
+        for (i, v) in data.iter().enumerate() {
+            text += &format!("{}{}", v, if i < data.len() - 1 { "," } else { "" });
         }
 
-        let mut total_cut = 0;
+        // 右标识
+        text += &format!("{}{}{}", if data.len() > 0 { " " } else { "" }, pair_seq, ')');
+        text
+    }
 
-        // list 类型
-        if let Some(v) = &mut self.v1 {
-            if uids.contains(&self.uid) {
-                return self.trim();
-            }
-            for obj in v {
-                total_cut += obj.trim_match(uids);
-            }
-        }
+    /// 恢复 pop_start() 前的 pair_seq
+    pub fn pop_end(&mut self, pair_seq: u32) {
+        self.pair_seq = pair_seq;
+    }
 
-        // dict 类型
-        if let Some(v) = &mut self.v2 {
-            if uids.contains(&self.uid) {
-                return self.trim();
-            }
-            for (k, v) in v {
-                total_cut += k.trim_match(uids) + v.trim_match(uids);
-            }
-        }
+    /// 恢复 push 保存的 pair_seq, 返回当前 pair_seq, pop_end() 使用
+    pub fn pop_start(&mut self) -> u32 {
+        // 备份
+        let pair_seq = self.pair_seq;
 
-        self.space -= total_cut;
-        total_cut
+        // 恢复
+        self.pair_seq = self.pair_stack.pop().unwrap_or(0);
+
+        // 再备份
+        pair_seq
+    }
+
+    /// 保存当前 pair_seq 备用, 然后 inc 给内部结构用
+    pub fn push_and_inc(&mut self) {
+        self.pair_stack.push(self.pair_seq);
+        self.pair_seq += 1;
     }
 }
 
-pub trait LimitPackAble {
-    fn to_limit_obj(&self, max: usize) -> LimitObj;
+pub struct ForStruct<T> {
+    pub k: String,
+    pub v: T,
+}
 
-    fn limit_pack(&self, limit: usize) -> String {
-        let mut root = self.to_limit_obj(limit);
-        root.limit_as_root(limit);
-        root.get_text()
+pub trait LimitPackAble {
+    /// 各类型转化为压缩后的字符串
+    fn to_limit_str(&self, limit: &mut Limit) -> String;
+
+    /// 各类型转化为压缩后的字符串
+    fn to_limit_str3(&self, array_limit: usize, dict_limit: usize, str_limit: usize) -> String {
+        let mut limit = Limit::new(array_limit, dict_limit, str_limit);
+        self.to_limit_str(&mut limit)
     }
 }
 
 macro_rules! default_limit_pack {
     ($type:ident, $fix:expr) => {
         impl LimitPackAble for $type {
-            fn to_limit_obj(&self, max: usize) -> LimitObj {
-                LimitObj::new_string(format!("{}", self), $fix, max)
+            fn to_limit_str(&self, limit: &mut Limit) -> String {
+                limit
+                    .clone(if $fix { 0 } else { limit.str_limit })
+                    .new_string(format!("{}", self))
             }
         }
     };
@@ -420,8 +225,8 @@ impl<T> LimitPackAble for &T
 where
     T: LimitPackAble + ?Sized,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        (**self).to_limit_obj(max)
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        (**self).to_limit_str(limit)
     }
 }
 
@@ -429,8 +234,8 @@ impl<T> LimitPackAble for &mut T
 where
     T: LimitPackAble + ?Sized,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        (**self).to_limit_obj(max)
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        (**self).to_limit_str(limit)
     }
 }
 
@@ -438,10 +243,10 @@ impl<T> LimitPackAble for Option<T>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
         match self {
-            Some(obj) => obj.to_limit_obj(max),
-            None => LimitObj::new_string("None".to_string(), true, 128),
+            Some(obj) => obj.to_limit_str(limit),
+            None => Limit::new(0, 0, 0).new_string("None".to_string()),
         }
     }
 }
@@ -455,14 +260,19 @@ macro_rules! tuple {
     ( $($name:ident,)+ ) => (
         impl<$($name:LimitPackAble),+> LimitPackAble for ($($name,)+) where last_type!($($name,)+): ?Sized {
             #[allow(non_snake_case, unused_assignments)]
-            fn to_limit_obj(&self, max:usize) -> LimitObj {
+            fn to_limit_str(&self, limit: &mut Limit) -> String {
                 let ($(ref $name,)+) = *self;
 
-                LimitObj::new_list(vec![
+                limit.push_and_inc();
+                let v = vec![
                     $(
-                        $name.to_limit_obj(max),
+                        $name.to_limit_str(limit),
                     )+
-                ], ('(',')'), true)
+                ];
+                let pair_seq = limit.pop_start();
+                let text = limit.new_tuple(&v);
+                limit.pop_end(pair_seq);
+                text
             }
         }
         peel! { $($name,)+ }
@@ -474,21 +284,14 @@ macro_rules! last_type {
     ($a:ident, $($rest_a:ident,)+) => { last_type!($($rest_a,)+) };
 }
 
-tuple! { E, D, C, B, A, Z, Y, X, W, V, U, T, }
+tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, }
 
 impl<T> LimitPackAble for [T]
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        LimitObj::new_list(
-            self.iter()
-                .enumerate()
-                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
-                .collect(),
-            ('[', ']'),
-            false,
-        )
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        limit.new_list(&self.iter().collect())
     }
 }
 
@@ -496,15 +299,8 @@ impl<T, const N: usize> LimitPackAble for [T; N]
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        LimitObj::new_list(
-            self.iter()
-                .enumerate()
-                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
-                .collect(),
-            ('[', ']'),
-            false,
-        )
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        limit.new_list(&self.iter().collect())
     }
 }
 
@@ -512,15 +308,8 @@ impl<T> LimitPackAble for Vec<T>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        LimitObj::new_list(
-            self.iter()
-                .enumerate()
-                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
-                .collect(),
-            ('[', ']'),
-            false,
-        )
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        limit.new_list(self)
     }
 }
 
@@ -528,15 +317,8 @@ impl<T> LimitPackAble for VecDeque<T>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        LimitObj::new_list(
-            self.iter()
-                .enumerate()
-                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
-                .collect(),
-            ('[', ']'),
-            false,
-        )
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        limit.new_list(&self.iter().collect())
     }
 }
 
@@ -544,15 +326,8 @@ impl<T, S> LimitPackAble for HashSet<T, S>
 where
     T: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        LimitObj::new_list(
-            self.iter()
-                .enumerate()
-                .map_while(|(i, x)| if i <= max { Some(x.to_limit_obj(max)) } else { None })
-                .collect(),
-            ('{', '}'),
-            false,
-        )
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        limit.new_list(&self.iter().collect())
     }
 }
 
@@ -561,12 +336,16 @@ where
     K: LimitPackAble,
     V: LimitPackAble,
 {
-    fn to_limit_obj(&self, max: usize) -> LimitObj {
-        LimitObj::new_dict(
-            self.iter()
-                .map(|(x, y)| (x.to_limit_obj(max), y.to_limit_obj(max)))
-                .collect(),
-            ('{', '}'),
-        )
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        limit.new_dict(&self.iter().collect())
+    }
+}
+
+impl<T> LimitPackAble for ForStruct<T>
+where
+    T: LimitPackAble,
+{
+    fn to_limit_str(&self, limit: &mut Limit) -> String {
+        format!("{}:{}", self.k, self.v.to_limit_str(limit))
     }
 }

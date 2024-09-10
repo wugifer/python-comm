@@ -51,14 +51,22 @@ pub mod use_basic {
 /// struct Abc {
 ///     a: i32,
 ///     b: &'static str,
+///     c: i32,
+///     d: Vec<Vec<i32>>,
+///     e: Vec<i32>,
 /// }
 ///
-/// assert_eq!(Abc{a:1, b:"abcdefghijk"}.limit_pack(15), "(a:1,b:abcdef~)");
+/// assert_eq!("01234567890123456789".to_limit_str3(4, 4, 12), "012345...8...456789");
+/// assert_eq!(vec![0,1,2,3,4,5,6,7,8,9].to_limit_str3(4, 4, 12), "[0 0,1,...6...8,9 0]");
+/// assert_eq!((0,1,2,3,4,5,6,7,8,9).to_limit_str3(4, 4, 12), "(0 0,1,2,3,4,5,6,7,8,9 0)");
+/// assert_eq!((1,1.1,-1.1,true,false).to_limit_str3(4, 4, 12), "(0 1,1.1,-1.1,true,false 0)");
+/// assert_eq!((1, "1", 1, vec![vec![1]], vec![1]).to_limit_str3(4, 4, 12), "(0 1,1,1,[1 [2 1 2] 1],[3 1 3] 0)");
+/// assert_eq!(Abc{a:1, b:"1", c:1, d:vec![vec![1]], e:vec![1]}.to_limit_str3(4, 4, 12), "Abc(0 a:1,b:1,c:1,d:[1 [2 1 2] 1],e:[3 1 3] 0)");
 /// ```
 ///
 pub mod use_limit_pack {
     pub use {
-        crate::limit_pack::{LimitObj, LimitPackAble},
+        crate::limit_pack::{ForStruct, Limit, LimitPackAble},
         python_comm_macros::LimitPack,
     };
 }
